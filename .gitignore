@@ -1,0 +1,23 @@
+# Dependencies
+node_modules/
+
+# Environment variables (keep secrets out of git)
+.env
+.env.bak
+.env.local
+.env.production
+
+# Uploads (generated at runtime)
+uploads/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Editor
+.vscode/
+.idea/
