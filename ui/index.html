@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>RapidCare - Hospital Management System</title>
+    <link rel="stylesheet" href="/css/styles.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+    <style>
+      .admin-container {
+        display: flex;
+        min-height: 100vh;
+        background: var(--bg-body);
+      }
+      .dashboard-container {
+        display: flex;
+        min-height: 100vh;
+        background: var(--bg-body);
+      }
+      .sidebar {
+        width: 280px;
+        background: #fff;
+        border-right: 1px solid var(--border-color);
+        display: flex;
+        flex-direction: column;
+        position: fixed;
+        height: 100vh;
+        z-index: 100;
+        box-shadow: var(--shadow-sm);
+      }
+      .sidebar-header {
+        padding: var(--spacing-lg);
+        border-bottom: 1px solid var(--border-color);
+        display: flex;
+        align-items: center;
+        gap: var(--spacing-sm);
+      }
+      .sidebar-nav {
+        padding: var(--spacing-md);
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: var(--spacing-xs);
+      }
+      .nav-item {
+        display: flex;
+        align-items: center;
+        gap: var(--spacing-sm);
+        padding: 0.75rem 1rem;
+        border-radius: var(--border-radius);
+        color: var(--text-muted);
+        font-weight: 500;
+        cursor: pointer;
+        transition: var(--transition-base);
+      }
+      .nav-item:hover {
+        background: rgba(11, 110, 253, 0.05);
+        color: var(--primary-color);
+      }
+      .nav-item.active {
+        background: rgba(11, 110, 253, 0.1);
+        color: var(--primary-color);
+        font-weight: 600;
+      }
+      .main-content {
+        flex: 1;
+        margin-left: 280px;
+        padding: var(--spacing-lg);
+      }
+
+      .bed-card {
+        background: white;
+        border-radius: 12px;
+        border: 1px solid var(--border-color);
+        padding: 1rem;
+        transition: all 0.2s ease;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        min-height: 140px;
+      }
+      .bed-card:hover {
+        transform: translateY(-3px);
+        box-shadow: var(--shadow-md);
+      }
+      .bed-status-btn {
+        width: 100%;
+        margin-top: 0.5rem;
+        padding: 0.4rem;
+        border-radius: 6px;
+        border: 1px solid var(--border-color);
+        font-size: 0.85rem;
+        font-weight: 600;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>

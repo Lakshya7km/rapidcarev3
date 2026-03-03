@@ -6,10 +6,11 @@ const QRCode = require('qrcode');
 const path = require('path');
 const fs = require('fs');
 const PDFDocument = require('pdfkit');
-const { auth } = require('../middleware/auth');
+const { auth, optionalAuth } = require('../middleware/auth');
+const { escapeHtml } = require('../utils/escapeHtml');
 
 module.exports = (io) => {
-  router.get('/:hospitalId', async (req, res) => {
+  router.get('/:hospitalId', optionalAuth(), async (req, res) => {
     try {
       // If a hospital is logged in, enforce scoping to its own hospitalId
       if (req.user && req.user.role === 'hospital' && req.user.ref !== req.params.hospitalId) {
@@ -165,61 +166,14 @@ module.exports = (io) => {
           <body>
             <div class="error">
               <h2>❌ Bed Not Found</h2>
-              <p>Bed ID "${req.params.bedId}" not found in system.</p>
+              <p>Bed ID "${escapeHtml(req.params.bedId)}" not found in system.</p>
             </div>
           </body>
           </html>
         `);
       }
 
-      const toSet = req.query.set;
-
-      if (toSet && ['Vacant', 'Occupied', 'Reserved', 'Cleaning'].includes(toSet)) {
-        const oldStatus = bed.status;
-        bed.status = toSet;
-        bed.lastUpdated = new Date();
-        await bed.save();
-
-        // Emit real-time update
-        io.to(`hospital_${bed.hospitalId}`).emit('bed:update', bed);
-
-        // Return success page
-        return res.send(`
-          <!DOCTYPE html>
-          <html>
-          <head>
-            <title>Bed Status Updated</title>
-            <meta name="viewport" content="width=device-width, initial-scale=1">
-            <style>
-              body { font-family: Arial, sans-serif; max-width: 400px; margin: 50px auto; padding: 20px; text-align: center; }
-              .success { color: #155724; background: #d4edda; padding: 20px; border-radius: 8px; }
-              .info { background: #f8f9fa; padding: 15px; border-radius: 8px; margin-top: 15px; }
-              .status-badge { padding: 4px 12px; border-radius: 12px; font-weight: bold; }
-              .vacant { background: #28a745; color: white; }
-              .occupied { background: #dc3545; color: white; }
-              .reserved { background: #ffc107; color: black; }
-              .cleaning { background: #6c757d; color: white; }
-            </style>
-          </head>
-          <body>
-            <div class="success">
-              <h2>✅ Bed Status Updated!</h2>
-              <p><strong>Bed:</strong> ${bed.bedNumber} (${bed.bedType})</p>
-              <p><strong>Ward:</strong> ${bed.wardNumber}</p>
-              <p><strong>Previous Status:</strong> <span class="status-badge ${oldStatus.toLowerCase()}">${oldStatus}</span></p>
-              <p><strong>New Status:</strong> <span class="status-badge ${toSet.toLowerCase()}">${toSet}</span></p>
-              <p><strong>Time:</strong> ${new Date().toLocaleString()}</p>
-            </div>
-            <div class="info">
-              <p>Bed status has been updated in the hospital system.</p>
-              <p><strong>Hospital:</strong> ${bed.hospitalId}</p>
-            </div>
-          </body>
-          </html>
-        `);
-      }
-
-      // If no status change, show bed info
+      // Bed scan is public for viewing, but status updates require login via API.
       return res.send(`
         <!DOCTYPE html>
         <html>
@@ -235,23 +189,68 @@ module.exports = (io) => {
             .reserved { background: #ffc107; color: black; }
             .cleaning { background: #6c757d; color: white; }
             .btn { padding: 10px 20px; margin: 5px; border: none; border-radius: 4px; color: white; cursor: pointer; text-decoration: none; display: inline-block; }
+            .muted { color: #6c757d; font-size: 0.95rem; }
+            .ok { color: #155724; background: #d4edda; padding: 10px; border-radius: 8px; margin-top: 12px; display: none; }
+            .err { color: #842029; background: #f8d7da; padding: 10px; border-radius: 8px; margin-top: 12px; display: none; }
           </style>
         </head>
         <body>
           <div class="info">
             <h2>🛏️ Bed Information</h2>
-            <p><strong>Bed:</strong> ${bed.bedNumber} (${bed.bedType})</p>
-            <p><strong>Ward:</strong> ${bed.wardNumber}</p>
-            <p><strong>Current Status:</strong> <span class="status-badge ${bed.status.toLowerCase()}">${bed.status}</span></p>
-            <p><strong>Hospital:</strong> ${bed.hospitalId}</p>
+            <p><strong>Bed:</strong> ${escapeHtml(bed.bedNumber)} (${escapeHtml(bed.bedType)})</p>
+            <p><strong>Ward:</strong> ${escapeHtml(bed.wardNumber)}</p>
+            <p><strong>Current Status:</strong> <span class="status-badge ${escapeHtml(String(bed.status || '').toLowerCase())}">${escapeHtml(bed.status || '')}</span></p>
+            <p><strong>Hospital:</strong> ${escapeHtml(bed.hospitalId)}</p>
           </div>
+
           <div style="margin-top: 20px;">
-            <h3>Update Status:</h3>
-            <a href="?set=Vacant" class="btn" style="background: #28a745;">Mark Vacant</a>
-            <a href="?set=Occupied" class="btn" style="background: #dc3545;">Mark Occupied</a>
-            <a href="?set=Reserved" class="btn" style="background: #ffc107; color: black;">Mark Reserved</a>
-            <a href="?set=Cleaning" class="btn" style="background: #6c757d;">Mark Cleaning</a>
+            <h3>Update Status</h3>
+            <p class="muted">Login as Nurse/Reception, then use the buttons below.</p>
+            <button class="btn" style="background: #28a745;" onclick="updateStatus('Vacant')">Mark Vacant</button>
+            <button class="btn" style="background: #dc3545;" onclick="updateStatus('Occupied')">Mark Occupied</button>
+            <button class="btn" style="background: #ffc107; color: black;" onclick="updateStatus('Reserved')">Mark Reserved</button>
+            <button class="btn" style="background: #6c757d;" onclick="updateStatus('Cleaning')">Mark Cleaning</button>
+            <div id="ok" class="ok"></div>
+            <div id="err" class="err"></div>
           </div>
+
+          <script>
+            async function updateStatus(status) {
+              const ok = document.getElementById('ok');
+              const err = document.getElementById('err');
+              ok.style.display = 'none';
+              err.style.display = 'none';
+              ok.textContent = '';
+              err.textContent = '';
+
+              try {
+                const token = localStorage.getItem('jwt') || '';
+                if (!token) {
+                  err.textContent = 'Login required: open the portal, login, then scan again.';
+                  err.style.display = 'block';
+                  return;
+                }
+
+                const res = await fetch('/api/beds/${encodeURIComponent(bed.bedId)}/status', {
+                  method: 'PATCH',
+                  headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+                  body: JSON.stringify({ status })
+                });
+
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) {
+                  throw new Error(data.message || 'Failed to update');
+                }
+
+                ok.textContent = 'Updated to ' + (data.bed && data.bed.status ? data.bed.status : status);
+                ok.style.display = 'block';
+                setTimeout(() => location.reload(), 800);
+              } catch (e) {
+                err.textContent = e.message || 'Failed to update';
+                err.style.display = 'block';
+              }
+            }
+          </script>
         </body>
         </html>
       `);
@@ -281,7 +280,7 @@ module.exports = (io) => {
   });
 
   // Mass QR PDF generation for bed ranges
-  router.get('/pdf/mass/:hospitalId', async (req, res) => {
+  router.get('/pdf/mass/:hospitalId', auth(['hospital', 'reception', 'admin']), async (req, res) => {
     try {
       console.log(`PDF generation request for hospital ${req.params.hospitalId}`);
       const { wardNumber, bedType } = req.query;
@@ -394,14 +393,46 @@ module.exports = (io) => {
     try {
       const bed = await Bed.findOne({ bedId: req.params.bedId });
       if (!bed) return res.status(404).send('Not found');
+
+      // Ensure the QR images exist for this bed. Some seed flows create beds without
+      // pre-generating PNGs/URLs, which would result in a blank PDF.
+      const root = path.join(__dirname, '..');
+      const qrDir = path.join(root, 'uploads', 'qrs');
+      if (!fs.existsSync(qrDir)) fs.mkdirSync(qrDir, { recursive: true });
+
+      const base = process.env.BASE_URL || 'http://localhost:5000';
+      const vacUrl = `${base}/api/beds/scan/${encodeURIComponent(bed.bedId)}?set=Vacant`;
+      const occUrl = `${base}/api/beds/scan/${encodeURIComponent(bed.bedId)}?set=Occupied`;
+      const vPath = path.join(qrDir, `${bed.bedId}-vacant.png`);
+      const oPath = path.join(qrDir, `${bed.bedId}-occupied.png`);
+
+      const needsVac = !bed.qrVacantUrl || !fs.existsSync(vPath);
+      const needsOcc = !bed.qrOccupiedUrl || !fs.existsSync(oPath);
+      if (needsVac) {
+        await QRCode.toFile(vPath, vacUrl);
+        bed.qrVacantUrl = `/uploads/qrs/${bed.bedId}-vacant.png`;
+      }
+      if (needsOcc) {
+        await QRCode.toFile(oPath, occUrl);
+        bed.qrOccupiedUrl = `/uploads/qrs/${bed.bedId}-occupied.png`;
+      }
+      if (needsVac || needsOcc) {
+        await bed.save();
+      }
+
       res.setHeader('Content-Type', 'application/pdf');
       const doc = new PDFDocument({ size: 'A4', margin: 40 });
       doc.pipe(res);
       doc.fontSize(20).text(`Bed ${bed.bedNumber} - ${bed.bedType}`, { align: 'center' });
       doc.moveDown();
-      const root = path.join(__dirname, '..');
-      const vacAbs = path.join(root, bed.qrVacantUrl.replace('/uploads', 'uploads'));
-      const occAbs = path.join(root, bed.qrOccupiedUrl.replace('/uploads', 'uploads'));
+
+      const toAbs = (u) => {
+        const rel = String(u || '').replace(/^\//, '');
+        return path.join(root, rel);
+      };
+
+      const vacAbs = toAbs(bed.qrVacantUrl);
+      const occAbs = toAbs(bed.qrOccupiedUrl);
       const w = 220; const x1 = 60, x2 = 320, y = 140;
       if (fs.existsSync(vacAbs)) { try { doc.image(vacAbs, x1, y, { width: w }); } catch (e) { } }
       if (fs.existsSync(occAbs)) { try { doc.image(occAbs, x2, y, { width: w }); } catch (e) { } }

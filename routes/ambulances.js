@@ -2,32 +2,41 @@
 const express = require('express');
 const router = express.Router();
 const Ambulance = require('../models/Ambulance');
-const { auth } = require('../middleware/auth');
+const { auth, optionalAuth } = require('../middleware/auth');
+const crypto = require('crypto');
 
 module.exports = (io) => {
-  router.get('/:hospitalId', async (req, res) => {
-    if (req.user && req.user.role === 'hospital' && req.user.ref !== req.params.hospitalId) {
-      return res.status(403).json({ message: 'Forbidden' });
+  router.get('/:hospitalId', optionalAuth(), async (req, res) => {
+    try {
+      if (req.user && req.user.role === 'hospital' && req.user.ref !== req.params.hospitalId) {
+        return res.status(403).json({ message: 'Forbidden' });
+      }
+      // Optimized with .lean() for faster performance
+      const list = await Ambulance.find({ hospitalId: req.params.hospitalId }).lean();
+      res.json(list);
+    } catch (err) {
+      res.status(500).json({ message: err.message });
     }
-    // Optimized with .lean() for faster performance
-    const list = await Ambulance.find({ hospitalId: req.params.hospitalId }).lean();
-    res.json(list);
   });
 
   // get ambulance by id or by emt/pilot id (query username=)
   router.get('/', async (req, res) => {
-    const { username } = req.query;
-    if (!username) return res.status(400).json({ message: 'username required' });
-    // Optimized with .lean()
-    const amb = await Ambulance.findOne({
-      $or: [
-        { ambulanceId: username },
-        { 'emt.emtId': username },
-        { 'pilot.pilotId': username }
-      ]
-    }).lean();
-    if (!amb) return res.status(404).json({ message: 'not found' });
-    res.json(amb);
+    try {
+      const { username } = req.query;
+      if (!username) return res.status(400).json({ message: 'username required' });
+      // Optimized with .lean()
+      const amb = await Ambulance.findOne({
+        $or: [
+          { ambulanceId: username },
+          { 'emt.emtId': username },
+          { 'pilot.pilotId': username }
+        ]
+      }).lean();
+      if (!amb) return res.status(404).json({ message: 'not found' });
+      res.json(amb);
+    } catch (err) {
+      res.status(500).json({ message: err.message });
+    }
   });
 
   router.post('/', auth(['hospital']), async (req, res) => {
@@ -49,9 +58,12 @@ module.exports = (io) => {
         return res.status(400).json({ success: false, message: 'Ambulance ID already exists' });
       }
 
-      const amb = new Ambulance({ ...req.body, password: 'test@1234', forcePasswordChange: true, status: 'Offline' });
+      const providedPassword = (req.body.password || '').trim();
+      const tempPassword = providedPassword || crypto.randomBytes(9).toString('base64url');
+
+      const amb = new Ambulance({ ...req.body, password: tempPassword, forcePasswordChange: true, status: 'Offline' });
       await amb.save();
-      res.json({ success: true, ambulance: amb });
+      res.json({ success: true, ambulance: amb, tempPassword: providedPassword ? undefined : tempPassword });
     } catch (err) {
       console.error('Ambulance creation error:', err);
       res.status(400).json({ success: false, message: err.message || 'Failed to create ambulance' });

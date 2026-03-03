@@ -1,25 +1,31 @@
 // Reset database route
+const mongoose = require('mongoose');
 const Hospital = require('../models/Hospital');
 const Doctor = require('../models/Doctor');
 const Bed = require('../models/Bed');
 const Ambulance = require('../models/Ambulance');
 const Attendance = require('../models/Attendance');
 const EmergencyRequest = require('../models/EmergencyRequest');
+const Nurse = require('../models/Nurse');
 const bcrypt = require('bcrypt');
+const crypto = require('crypto');
 const QRCode = require('qrcode');
 const path = require('path');
 const fs = require('fs');
+const { auth } = require('../middleware/auth');
 
 module.exports = (io) => {
   const router = require('express').Router();
 
   // Reset database endpoint
-  router.post('/', async (req, res) => {
+  router.post('/', auth(['superadmin']), async (req, res) => {
     try {
       console.log('🔄 Starting database reset...');
       console.log('🔄 Dropping database...');
       await mongoose.connection.db.dropDatabase();
       console.log('🗑️  Database dropped');
+
+      const tempPasswords = { hospitals: {}, doctors: {}, ambulances: {}, nurses: {} };
 
       // Create dummy hospitals
       const hospitals = [
@@ -36,7 +42,11 @@ module.exports = (io) => {
           treatment: ['Cardiology', 'Neurology', 'Oncology', 'Pediatrics'],
           surgery: ['Appendectomy', 'Gallbladder', 'Hernia'],
           therapy: ['Physiotherapy', 'Occupational Therapy'],
-          password: bcrypt.hashSync('test@1234', 10),
+          password: (() => {
+            const p = crypto.randomBytes(9).toString('base64url');
+            tempPasswords.hospitals['AIIMS-RPR'] = p;
+            return bcrypt.hashSync(p, 10);
+          })(),
           forcePasswordChange: true
         },
         {
@@ -52,7 +62,11 @@ module.exports = (io) => {
           treatment: ['Neurology', 'Cardiology', 'Oncology'],
           surgery: ['Bypass', 'Brain Surgery', 'Cancer Surgery'],
           therapy: ['Occupational', 'Speech Therapy'],
-          password: bcrypt.hashSync('test@1234', 10),
+          password: (() => {
+            const p = crypto.randomBytes(9).toString('base64url');
+            tempPasswords.hospitals['MEKAHARA-RPR'] = p;
+            return bcrypt.hashSync(p, 10);
+          })(),
           forcePasswordChange: true
         },
         {
@@ -68,7 +82,11 @@ module.exports = (io) => {
           treatment: ['Gynecology', 'Pediatrics', 'General Medicine'],
           surgery: ['C-Section', 'Hysterectomy', 'Appendectomy'],
           therapy: ['Physiotherapy', 'Occupational Therapy'],
-          password: bcrypt.hashSync('test@1234', 10),
+          password: (() => {
+            const p = crypto.randomBytes(9).toString('base64url');
+            tempPasswords.hospitals['NH-NARAYANA'] = p;
+            return bcrypt.hashSync(p, 10);
+          })(),
           forcePasswordChange: true
         }
       ];
@@ -107,7 +125,11 @@ module.exports = (io) => {
           speciality: 'Cardiology',
           experience: '15 yrs',
           photoUrl: '',
-          password: bcrypt.hashSync('test@1234', 10),
+          password: (() => {
+            const p = crypto.randomBytes(9).toString('base64url');
+            tempPasswords.doctors['DOC-AIIMS-01'] = p;
+            return bcrypt.hashSync(p, 10);
+          })(),
           forcePasswordChange: true,
           availability: 'Available',
           shift: 'Morning'
@@ -120,7 +142,11 @@ module.exports = (io) => {
           speciality: 'Neurology',
           experience: '10 yrs',
           photoUrl: '',
-          password: bcrypt.hashSync('test@1234', 10),
+          password: (() => {
+            const p = crypto.randomBytes(9).toString('base64url');
+            tempPasswords.doctors['DOC-AIIMS-02'] = p;
+            return bcrypt.hashSync(p, 10);
+          })(),
           forcePasswordChange: true,
           availability: 'Available',
           shift: 'Afternoon'
@@ -133,7 +159,11 @@ module.exports = (io) => {
           speciality: 'Surgery',
           experience: '20 yrs',
           photoUrl: '',
-          password: bcrypt.hashSync('test@1234', 10),
+          password: (() => {
+            const p = crypto.randomBytes(9).toString('base64url');
+            tempPasswords.doctors['DOC-MEK-01'] = p;
+            return bcrypt.hashSync(p, 10);
+          })(),
           forcePasswordChange: true,
           availability: 'Available',
           shift: 'Morning'
@@ -146,7 +176,11 @@ module.exports = (io) => {
           speciality: 'Oncology',
           experience: '12 yrs',
           photoUrl: '',
-          password: bcrypt.hashSync('test@1234', 10),
+          password: (() => {
+            const p = crypto.randomBytes(9).toString('base64url');
+            tempPasswords.doctors['DOC-NH-01'] = p;
+            return bcrypt.hashSync(p, 10);
+          })(),
           forcePasswordChange: true,
           availability: 'Available',
           shift: 'Morning'
@@ -164,7 +198,11 @@ module.exports = (io) => {
           vehicleNumber: 'CG04-AMB-01',
           emt: { name: 'Sanjay Sahu', mobile: '9876543210', emtId: 'EMT-01' },
           pilot: { name: 'Vikram Singh', mobile: '9876543212', pilotId: 'PIL-01' },
-          password: bcrypt.hashSync('test@1234', 10),
+          password: (() => {
+            const p = crypto.randomBytes(9).toString('base64url');
+            tempPasswords.ambulances['AMB-AIIMS-01'] = p;
+            return bcrypt.hashSync(p, 10);
+          })(),
           forcePasswordChange: true,
           status: 'On Duty'
         },
@@ -175,13 +213,46 @@ module.exports = (io) => {
           vehicleNumber: 'CG04-AMB-02',
           emt: { name: 'Rahul Gond', mobile: '9876543211', emtId: 'EMT-02' },
           pilot: { name: 'Rajesh Kumar', mobile: '9876543213', pilotId: 'PIL-02' },
-          password: bcrypt.hashSync('test@1234', 10),
+          password: (() => {
+            const p = crypto.randomBytes(9).toString('base64url');
+            tempPasswords.ambulances['AMB-NH-01'] = p;
+            return bcrypt.hashSync(p, 10);
+          })(),
           forcePasswordChange: true,
           status: 'On Duty'
         }
       ];
       await Ambulance.collection.insertMany(ambulances, { bypassDocumentValidation: true });
       console.log(`✅ Created ${ambulances.length} ambulances`);
+
+      // Create AIIMS-RPR nurses (login via /api/nurse/login)
+      const nurses = [
+        {
+          nurseId: 'NUR-AIIMS-01',
+          name: 'Nurse Anjali',
+          mobile: '9000000001',
+          hospitalId: 'AIIMS-RPR',
+          password: (() => {
+            const p = crypto.randomBytes(9).toString('base64url');
+            tempPasswords.nurses['NUR-AIIMS-01'] = p;
+            return bcrypt.hashSync(p, 10);
+          })(),
+        },
+        {
+          nurseId: 'NUR-AIIMS-02',
+          name: 'Nurse Rohan',
+          mobile: '9000000002',
+          hospitalId: 'AIIMS-RPR',
+          password: (() => {
+            const p = crypto.randomBytes(9).toString('base64url');
+            tempPasswords.nurses['NUR-AIIMS-02'] = p;
+            return bcrypt.hashSync(p, 10);
+          })(),
+        }
+      ];
+
+      await Nurse.collection.insertMany(nurses, { bypassDocumentValidation: true });
+      console.log(`✅ Created ${nurses.length} nurses`);
 
       // Create dummy beds for each hospital
       const beds = [];
@@ -205,14 +276,13 @@ module.exports = (io) => {
             status: i % 2 === 0 ? 'Occupied' : 'Vacant'
           };
 
-          // Generate Bed QRs
-          const vacUrl = `${base}/api/beds/scan/${bedId}?set=Vacant`;
-          const occUrl = `${base}/api/beds/scan/${bedId}?set=Occupied`;
+          // Generate Bed QRs (scan/info only; status changes require login on scan page)
+          const scanUrl = `${base}/api/beds/scan/${bedId}`;
           const vPath = path.join(qrDir, `${bedId}-vacant.png`);
           const oPath = path.join(qrDir, `${bedId}-occupied.png`);
 
-          await QRCode.toFile(vPath, vacUrl);
-          await QRCode.toFile(oPath, occUrl);
+          await QRCode.toFile(vPath, scanUrl);
+          await QRCode.toFile(oPath, scanUrl);
 
           bed.qrVacantUrl = `/uploads/qrs/${bedId}-vacant.png`;
           bed.qrOccupiedUrl = `/uploads/qrs/${bedId}-occupied.png`;
@@ -233,14 +303,13 @@ module.exports = (io) => {
             status: i % 3 === 0 ? 'Occupied' : 'Vacant'
           };
 
-          // Generate Bed QRs
-          const vacUrl = `${base}/api/beds/scan/${bedId}?set=Vacant`;
-          const occUrl = `${base}/api/beds/scan/${bedId}?set=Occupied`;
+          // Generate Bed QRs (scan/info only; status changes require login on scan page)
+          const scanUrl = `${base}/api/beds/scan/${bedId}`;
           const vPath = path.join(qrDir, `${bedId}-vacant.png`);
           const oPath = path.join(qrDir, `${bedId}-occupied.png`);
 
-          await QRCode.toFile(vPath, vacUrl);
-          await QRCode.toFile(oPath, occUrl);
+          await QRCode.toFile(vPath, scanUrl);
+          await QRCode.toFile(oPath, scanUrl);
 
           bed.qrVacantUrl = `/uploads/qrs/${bedId}-vacant.png`;
           bed.qrOccupiedUrl = `/uploads/qrs/${bedId}-occupied.png`;
@@ -255,13 +324,13 @@ module.exports = (io) => {
       // Create some sample attendance records
       const attendanceRecords = [
         {
-          doctorId: 'DOC100',
+          doctorId: 'DOC-AIIMS-01',
           date: new Date(),
           availability: 'Present',
           shift: 'Morning'
         },
         {
-          doctorId: 'DOC101',
+          doctorId: 'DOC-AIIMS-02',
           date: new Date(),
           availability: 'Present',
           shift: 'Afternoon'
@@ -279,19 +348,22 @@ module.exports = (io) => {
           doctors: doctors.length,
           ambulances: ambulances.length,
           beds: beds.length,
-          attendance: attendanceRecords.length
+          attendance: attendanceRecords.length,
+          nurses: nurses.length
         }
       });
 
       res.json({
         success: true,
         message: 'Database reset successfully',
+        tempPasswords,
         counts: {
           hospitals: hospitals.length,
           doctors: doctors.length,
           ambulances: ambulances.length,
           beds: beds.length,
-          attendance: attendanceRecords.length
+          attendance: attendanceRecords.length,
+          nurses: nurses.length
         }
       });
 

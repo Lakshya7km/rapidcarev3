@@ -3,10 +3,12 @@ const express = require('express');
 const router = express.Router();
 const Doctor = require('../models/Doctor');
 const Attendance = require('../models/Attendance');
-const { auth } = require('../middleware/auth');
+const { auth, optionalAuth } = require('../middleware/auth');
 const QRCode = require('qrcode');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
+const { escapeHtml } = require('../utils/escapeHtml');
 
 const multer = require('multer');
 
@@ -39,14 +41,18 @@ module.exports = (io) => {
     }
   });
 
-  router.get('/:hospitalId', async (req, res) => {
-    // If a hospital is logged in, enforce scoping
-    if (req.user && req.user.role === 'hospital' && req.user.ref !== req.params.hospitalId) {
-      return res.status(403).json({ message: 'Forbidden' });
+  router.get('/:hospitalId', optionalAuth(), async (req, res) => {
+    try {
+      // If a hospital is logged in, enforce scoping
+      if (req.user && req.user.role === 'hospital' && req.user.ref !== req.params.hospitalId) {
+        return res.status(403).json({ message: 'Forbidden' });
+      }
+      // Optimized with .lean() for faster performance
+      const doctors = await Doctor.find({ hospitalId: req.params.hospitalId }).lean();
+      res.json(doctors);
+    } catch (err) {
+      res.status(500).json({ message: err.message });
     }
-    // Optimized with .lean() for faster performance
-    const doctors = await Doctor.find({ hospitalId: req.params.hospitalId }).lean();
-    res.json(doctors);
   });
 
   router.post('/', auth(['hospital']), upload.single('photo'), async (req, res) => {
@@ -68,14 +74,17 @@ module.exports = (io) => {
 
       const photoUrl = req.file ? `/uploads/hospitals/${req.body.hospitalId}/doctors/${req.file.filename}` : '';
 
+      const providedPassword = (req.body.password || '').trim();
+      const tempPassword = providedPassword || crypto.randomBytes(9).toString('base64url');
+
       const doc = new Doctor({
         ...req.body,
-        password: 'test@1234',
+        password: tempPassword,
         forcePasswordChange: true,
         photoUrl
       });
       await doc.save();
-      res.json({ success: true, doctor: doc });
+      res.json({ success: true, doctor: doc, tempPassword: providedPassword ? undefined : tempPassword });
     } catch (err) {
       console.error('Doctor creation error:', err);
       res.status(400).json({ success: false, message: err.message || 'Failed to create doctor' });
@@ -164,8 +173,17 @@ module.exports = (io) => {
   });
 
   router.delete('/:doctorId', auth(['hospital']), async (req, res) => {
-    await Doctor.findOneAndDelete({ doctorId: req.params.doctorId });
-    res.json({ success: true });
+    try {
+      const existing = await Doctor.findOne({ doctorId: req.params.doctorId });
+      if (!existing) return res.status(404).json({ success: false, message: 'Doctor not found' });
+      if (req.user.role === 'hospital' && req.user.ref !== existing.hospitalId) {
+        return res.status(403).json({ success: false, message: 'Forbidden' });
+      }
+      await Doctor.findOneAndDelete({ doctorId: req.params.doctorId });
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
   });
 
   router.post('/attendance', auth(['doctor', 'hospital']), async (req, res) => {
@@ -368,7 +386,7 @@ module.exports = (io) => {
           <body>
             <div class="error">
               <h2>❌ Doctor Not Found</h2>
-              <p>Doctor ID "${req.params.doctorId}" not found in system.</p>
+              <p>Doctor ID "${escapeHtml(req.params.doctorId)}" not found in system.</p>
             </div>
           </body>
           </html>
@@ -407,9 +425,9 @@ module.exports = (io) => {
         <body>
           <div class="success">
             <h2>✅ Attendance Marked Successfully!</h2>
-            <p><strong>Doctor:</strong> ${doctor.name || req.params.doctorId}</p>
-            <p><strong>Status:</strong> ${set}</p>
-            <p><strong>Shift:</strong> ${shift}</p>
+            <p><strong>Doctor:</strong> ${escapeHtml(doctor.name || req.params.doctorId)}</p>
+            <p><strong>Status:</strong> ${escapeHtml(set)}</p>
+            <p><strong>Shift:</strong> ${escapeHtml(shift)}</p>
             <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
             <p><strong>Time:</strong> ${new Date().toLocaleTimeString()}</p>
           </div>

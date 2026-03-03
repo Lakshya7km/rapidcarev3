@@ -200,8 +200,8 @@
                             class="btn btn-outline text-success border-success py-2 font-bold">✅ Vacant</button>
                         <button onclick="confirmStatusUpdate('Occupied')"
                             class="btn btn-outline text-danger border-danger py-2 font-bold">🛌 Occupied</button>
-                        <button onclick="confirmStatusUpdate('Maintenance')"
-                            class="btn btn-outline text-warning border-warning py-2 font-bold">⚠️ Maintenance</button>
+                        <button onclick="confirmStatusUpdate('Reserved')"
+                            class="btn btn-outline text-warning border-warning py-2 font-bold">⚠️ Reserved</button>
                         <button onclick="confirmStatusUpdate('Cleaning')"
                             class="btn btn-outline text-muted border-secondary py-2 font-bold">🧹 Cleaning</button>
                     </div>
@@ -252,7 +252,10 @@
             }
 
             try {
-                const res = await login('nurse', username, password);
+                const res = await api('/api/nurse/login', {
+                    method: 'POST',
+                    body: JSON.stringify({ username, password })
+                });
                 localStorage.setItem('role', 'nurse');
                 localStorage.setItem('nurse', JSON.stringify(res.nurse));
                 localStorage.setItem('jwt', res.token);
@@ -304,8 +307,8 @@
                 const beds = await api('/api/nurse/beds');
                 const grid = document.getElementById('bed-grid');
                 grid.innerHTML = beds.map(bed => {
-                    const statusClass = bed.status === 'Vacant' ? 'success' : bed.status === 'Occupied' ? 'danger' : bed.status === 'Maintenance' ? 'warning' : 'secondary';
-                    const icon = bed.status === 'Vacant' ? '✅' : bed.status === 'Occupied' ? '🛌' : bed.status === 'Maintenance' ? '⚠️' : '🧹';
+                    const statusClass = bed.status === 'Vacant' ? 'success' : bed.status === 'Occupied' ? 'danger' : bed.status === 'Reserved' ? 'warning' : 'secondary';
+                    const icon = bed.status === 'Vacant' ? '✅' : bed.status === 'Occupied' ? '🛌' : bed.status === 'Reserved' ? '⚠️' : '🧹';
 
                     return `
                     <div class="bed-card shadow-sm border-top-width-3" style="border-top: 3px solid var(--${statusClass}-color);">
@@ -317,7 +320,7 @@
                        <select onchange="updateBedStatus('${bed.bedId}', this.value)" class="bed-status-btn">
                          <option value="Vacant" ${bed.status === 'Vacant' ? 'selected' : ''}>Vacant</option>
                          <option value="Occupied" ${bed.status === 'Occupied' ? 'selected' : ''}>Occupied</option>
-                         <option value="Maintenance" ${bed.status === 'Maintenance' ? 'selected' : ''}>Maintenance</option>
+                         <option value="Reserved" ${bed.status === 'Reserved' ? 'selected' : ''}>Reserved</option>
                          <option value="Cleaning" ${bed.status === 'Cleaning' ? 'selected' : ''}>Cleaning</option>
                        </select>
                     </div>
@@ -329,9 +332,9 @@
 
         async function updateBedStatus(bedId, status) {
             try {
-                await api('/api/nurse/bed-status', {
-                    method: 'PUT',
-                    body: JSON.stringify({ bedId, status })
+                await api(`/api/beds/${encodeURIComponent(bedId)}/status`, {
+                    method: 'PATCH',
+                    body: JSON.stringify({ status })
                 });
                 notify(`Bed ${bedId} updated to ${status}`, 'success');
             } catch (e) { notify(e.message, 'error'); }

@@ -5,7 +5,7 @@ const Emergency = require('../models/EmergencyRequest');
 const Ambulance = require('../models/Ambulance');
 const Hospital = require('../models/Hospital');
 const Bed = require('../models/Bed');
-const { auth } = require('../middleware/auth');
+const { auth, optionalAuth } = require('../middleware/auth');
 
 
 
@@ -163,15 +163,19 @@ module.exports = (socketIo) => {
   });
 
   // Get all emergencies for a hospital (both public and ambulance)
-  router.get('/:hospitalId', async (req, res) => {
-    if (req.user && req.user.role === 'hospital' && req.user.ref !== req.params.hospitalId) {
-      return res.status(403).json({ message: 'Forbidden' });
+  router.get('/:hospitalId', optionalAuth(), async (req, res) => {
+    try {
+      if (req.user && req.user.role === 'hospital' && req.user.ref !== req.params.hospitalId) {
+        return res.status(403).json({ message: 'Forbidden' });
+      }
+      // Optimized with .lean()
+      const list = await Emergency.find({ hospitalId: req.params.hospitalId })
+        .sort({ createdAt: -1 })
+        .lean();
+      res.json(list);
+    } catch (err) {
+      res.status(500).json({ message: err.message });
     }
-    // Optimized with .lean()
-    const list = await Emergency.find({ hospitalId: req.params.hospitalId })
-      .sort({ createdAt: -1 })
-      .lean();
-    res.json(list);
   });
 
   // Get public emergencies (unassigned or for specific hospital)

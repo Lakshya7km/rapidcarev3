@@ -4,7 +4,7 @@ const jwt = require('jsonwebtoken');
 const Nurse = require('../models/Nurse');
 const Hospital = require('../models/Hospital');
 const Bed = require('../models/Bed');
-const { auth } = require('../middleware/auth');
+const { auth, getJwtSecret } = require('../middleware/auth');
 
 // Nurse Login
 router.post('/login', async (req, res) => {
@@ -14,7 +14,7 @@ router.post('/login', async (req, res) => {
         // User said "Reception can do create there particular user like doctor, emt/ambulance, nurse"
         // So Nurse login likely by nurseId
 
-        const nurse = await Nurse.findOne({ nurseId: username });
+        const nurse = await Nurse.findOne({ nurseId: username }).collation({ locale: 'en', strength: 2 });
         if (!nurse) return res.status(404).json({ message: 'Nurse not found' });
 
         // Simple password check for now (or bcrypt if we hash nurse passwords)
@@ -24,11 +24,16 @@ router.post('/login', async (req, res) => {
 
         if (!isMatch) return res.status(400).json({ message: 'Invalid credentials' });
 
-        const token = jwt.sign({
-            id: nurse._id,
-            role: 'nurse',
-            hospitalId: nurse.hospitalId
-        }, process.env.JWT_SECRET || 'devsecret');
+        const token = jwt.sign(
+            {
+                id: nurse._id,
+                role: 'nurse',
+                ref: nurse.nurseId,
+                hospitalId: nurse.hospitalId
+            },
+            getJwtSecret(),
+            { expiresIn: '24h' }
+        );
 
         res.json({ token, nurse });
     } catch (e) {
@@ -47,8 +52,11 @@ router.get('/beds', auth(['nurse']), async (req, res) => {
 });
 
 // GET all nurses for a hospital (Reception)
-router.get('/:hospitalId', async (req, res) => {
+router.get('/:hospitalId', auth(['hospital', 'superadmin']), async (req, res) => {
     try {
+        if (req.user.role === 'hospital' && String(req.user.ref || '').toUpperCase() !== String(req.params.hospitalId || '').toUpperCase()) {
+            return res.status(403).json({ message: 'Forbidden' });
+        }
         const nurses = await Nurse.find({ hospitalId: req.params.hospitalId });
         res.json(nurses);
     } catch (e) {
@@ -57,15 +65,24 @@ router.get('/:hospitalId', async (req, res) => {
 });
 
 // Register new nurse (Reception)
-router.post('/', async (req, res) => {
+router.post('/', auth(['hospital', 'superadmin']), async (req, res) => {
     try {
         const { nurseId, name, mobile, hospitalId, password } = req.body;
+
+        if (!hospitalId || typeof hospitalId !== 'string' || hospitalId.trim() === '') {
+            return res.status(400).json({ message: 'hospitalId is required' });
+        }
+
+        if (req.user.role === 'hospital' && String(req.user.ref || '').toUpperCase() !== String(hospitalId || '').toUpperCase()) {
+            return res.status(403).json({ message: 'Forbidden' });
+        }
 
         // Check if nurse already exists
         const existing = await Nurse.findOne({ nurseId });
         if (existing) return res.status(400).json({ message: 'Nurse ID already exists' });
 
-        const hashedPassword = await bcrypt.hash(password || 'test@1234', 10);
+        if (!password) return res.status(400).json({ message: 'Password is required' });
+        const hashedPassword = await bcrypt.hash(password, 10);
 
         const nurse = new Nurse({
             nurseId,
@@ -83,9 +100,14 @@ router.post('/', async (req, res) => {
 });
 
 // Delete nurse (Reception)
-router.delete('/:nurseId', async (req, res) => {
+router.delete('/:nurseId', auth(['hospital', 'superadmin']), async (req, res) => {
     try {
-        const result = await Nurse.findOneAndDelete({ nurseId: req.params.nurseId });
+        const existing = await Nurse.findOne({ nurseId: req.params.nurseId }).collation({ locale: 'en', strength: 2 });
+        if (!existing) return res.status(404).json({ message: 'Nurse not found' });
+        if (req.user.role === 'hospital' && String(req.user.ref || '').toUpperCase() !== String(existing.hospitalId || '').toUpperCase()) {
+            return res.status(403).json({ message: 'Forbidden' });
+        }
+        const result = await Nurse.findOneAndDelete({ nurseId: req.params.nurseId }).collation({ locale: 'en', strength: 2 });
         if (!result) return res.status(404).json({ message: 'Nurse not found' });
         res.json({ success: true, message: 'Nurse deleted successfully' });
     } catch (e) {
@@ -98,15 +120,18 @@ module.exports = (io) => {
     router.put('/bed-status', auth(['nurse']), async (req, res) => {
         try {
             const { bedId, status } = req.body;
+            const allowed = ['Vacant', 'Occupied', 'Reserved', 'Cleaning'];
+            if (!bedId || typeof bedId !== 'string' || bedId.trim() === '') {
+                return res.status(400).json({ message: 'bedId is required' });
+            }
+            if (!status || !allowed.includes(status)) {
+                return res.status(400).json({ message: 'Invalid status' });
+            }
             const bed = await Bed.findOne({ bedId, hospitalId: req.user.hospitalId });
 
             if (!bed) return res.status(404).json({ message: 'Bed not found' });
 
             bed.status = status;
-            // Mark occupiedBy as null if vacant? 
-            if (status === 'Vacant') {
-                bed.occupiedBy = null;
-            }
 
             await bed.save();
 
@@ -115,7 +140,7 @@ module.exports = (io) => {
                 bedId,
                 hospitalId: req.user.hospitalId,
                 status,
-                occupiedBy: bed.occupiedBy
+                bed
             });
 
             // Public update

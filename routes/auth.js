@@ -5,12 +5,17 @@ const Hospital = require('../models/Hospital');
 const Doctor = require('../models/Doctor');
 const Ambulance = require('../models/Ambulance');
 const Nurse = require('../models/Nurse');
+const { getJwtSecret } = require('../middleware/auth');
 
 const router = express.Router();
 
 const signToken = (payload) => {
-  return jwt.sign(payload, process.env.JWT_SECRET || 'devsecret', { expiresIn: '24h' });
+  return jwt.sign(payload, getJwtSecret(), { expiresIn: '24h' });
 }
+
+const findOneCaseInsensitive = (Model, filter) => {
+  return Model.findOne(filter).collation({ locale: 'en', strength: 2 });
+};
 
 router.post('/login', async (req, res) => {
   try {
@@ -23,21 +28,22 @@ router.post('/login', async (req, res) => {
     let userType = '';
 
     if (role === 'hospital') {
-      user = await Hospital.findOne({ hospitalId: { $regex: `^${username}$`, $options: 'i' } });
+      user = await findOneCaseInsensitive(Hospital, { hospitalId: username });
       userType = 'Hospital';
     } else if (role === 'doctor') {
-      user = await Doctor.findOne({ doctorId: { $regex: `^${username}$`, $options: 'i' } });
+      user = await findOneCaseInsensitive(Doctor, { doctorId: username });
       userType = 'Doctor';
     } else if (role === 'ambulance') {
-      const rx = { $regex: `^${username}$`, $options: 'i' };
-      user = await Ambulance.findOne({ $or: [{ 'emt.emtId': rx }, { 'pilot.pilotId': rx }, { ambulanceId: rx }] });
+      user = await findOneCaseInsensitive(Ambulance, {
+        $or: [{ 'emt.emtId': username }, { 'pilot.pilotId': username }, { ambulanceId: username }]
+      });
       userType = 'Ambulance';
     } else if (role === 'nurse') {
-      user = await Nurse.findOne({ nurseId: { $regex: `^${username}$`, $options: 'i' } });
+      user = await findOneCaseInsensitive(Nurse, { nurseId: username });
       userType = 'Nurse';
     } else if (role === 'superadmin') {
       const SuperAdmin = require('../models/SuperAdmin');
-      user = await SuperAdmin.findOne({ username: { $regex: `^${username}$`, $options: 'i' } });
+      user = await findOneCaseInsensitive(SuperAdmin, { username });
       userType = 'SuperAdmin';
     } else {
       return res.status(400).json({ message: 'Invalid role' });
@@ -95,13 +101,17 @@ router.post('/change-password', async (req, res) => {
     if (role === 'hospital') { Model = Hospital; filter = { hospitalId: username }; }
     if (role === 'doctor') { Model = Doctor; filter = { doctorId: username }; }
     if (role === 'ambulance') { Model = Ambulance; filter = { $or: [{ 'emt.emtId': username }, { 'pilot.pilotId': username }, { ambulanceId: username }] }; }
+    if (role === 'nurse') { Model = Nurse; filter = { nurseId: username }; }
+    if (role === 'superadmin') { Model = require('../models/SuperAdmin'); filter = { username }; }
 
     if (!Model) return res.status(400).json({ message: 'Invalid role' });
-    const doc = await Model.findOne(filter);
+    const doc = await findOneCaseInsensitive(Model, filter);
     if (!doc) return res.status(404).json({ message: 'User not found' });
 
     doc.password = newPassword;
-    doc.forcePasswordChange = false;
+    if (typeof doc.forcePasswordChange !== 'undefined') {
+      doc.forcePasswordChange = false;
+    }
     await doc.save(); // triggers pre-save hook for hashing
 
     res.json({ success: true });

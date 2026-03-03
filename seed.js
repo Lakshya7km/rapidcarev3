@@ -6,6 +6,8 @@ const Bed = require('./models/Bed');
 const Ambulance = require('./models/Ambulance');
 const Attendance = require('./models/Attendance');
 const EmergencyRequest = require('./models/EmergencyRequest');
+const Nurse = require('./models/Nurse');
+const SuperAdmin = require('./models/SuperAdmin');
 const bcrypt = require('bcrypt');
 const QRCode = require('qrcode');
 const path = require('path');
@@ -98,6 +100,19 @@ async function fullSeed() {
             await new Doctor(d).save();
         }
         console.log(`✅ Created ${doctors.length} doctors`);
+
+        const nurses = [
+            { hospitalId: 'AIIMS-RPR', nurseId: 'NURSE-AIIMS-01', name: 'Sister Anita', mobile: '9888888888', password: 'test@1234' },
+            { hospitalId: 'NH-NARAYANA', nurseId: 'NURSE-NH-01', name: 'Sister Sunita', mobile: '9999999999', password: 'test@1234' }
+        ];
+        for (const n of nurses) {
+            await new Nurse(n).save();
+        }
+        console.log(`✅ Created ${nurses.length} nurses`);
+
+        const superAdmin = { username: 'admin', password: 'test@1234' };
+        await new SuperAdmin(superAdmin).save();
+        console.log(`✅ Created SuperAdmin admin`);
 
         const ambulances = [
             { hospitalId: 'AIIMS-RPR', ambulanceId: 'AMB-AIIMS-01', ambulanceNumber: 'CG04-AMB-01', vehicleNumber: 'CG04-AMB-01', password: 'test@1234', status: 'On Duty', emt: { name: 'Sanjay Sahu', mobile: '9876543210', emtId: 'EMT-01' } },

@@ -16,7 +16,7 @@ const DoctorSchema = new mongoose.Schema(
       lng: Number,
       updatedAt: Date
     },
-    password: { type: String, default: 'test@1234' },
+    password: { type: String, required: true },
     forcePasswordChange: { type: Boolean, default: true },
     availability: { type: String, enum: ['Available', 'Not Available'], default: 'Not Available' },
     shift: { type: String, enum: ['Morning', 'Afternoon', 'Evening', 'Night'], default: 'Morning' },

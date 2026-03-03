@@ -437,7 +437,7 @@
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${localStorage.getItem('superAdminToken')}`
+            'Authorization': `Bearer ${localStorage.getItem('jwt')}`
           },
           body: JSON.stringify(body)
         });
@@ -460,7 +460,7 @@
       try {
         const res = await fetch(`/api/master/${collection}/${id}`, {
           method: 'DELETE',
-          headers: { 'Authorization': `Bearer ${localStorage.getItem('superAdminToken')}` }
+          headers: { 'Authorization': `Bearer ${localStorage.getItem('jwt')}` }
         });
         const data = await res.json();
         if (data.success) {
@@ -477,7 +477,7 @@
     async function loadStats() {
       try {
         const res = await fetch(`${API_URL}/stats`, {
-          headers: { 'Authorization': `Bearer ${localStorage.getItem('superAdminToken')}` }
+          headers: { 'Authorization': `Bearer ${localStorage.getItem('jwt')}` }
         });
         const data = await res.json();
 
@@ -517,7 +517,7 @@
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${localStorage.getItem('superAdminToken')}`
+            'Authorization': `Bearer ${localStorage.getItem('jwt')}`
           },
           body: JSON.stringify(body)
         });

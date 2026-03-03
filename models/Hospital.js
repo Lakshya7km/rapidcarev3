@@ -16,6 +16,7 @@ const HospitalSchema = new mongoose.Schema(
   {
     hospitalId: { type: String, required: true, unique: true, index: true },
     name: { type: String, default: '' },
+    email: { type: String, default: '' },
     address: { type: addressSchema, default: {} },
     contact: { type: String, default: '' },
     googleMapUrl: { type: String, default: '' },
@@ -34,7 +35,7 @@ const HospitalSchema = new mongoose.Schema(
     treatment: { type: [String], default: [] },
     surgery: { type: [String], default: [] },
     therapy: { type: [String], default: [] },
-    password: { type: String, default: 'test@1234' },
+    password: { type: String, required: true },
     forcePasswordChange: { type: Boolean, default: true },
     attendanceQR: {
       presentQR: { type: String, default: '' },

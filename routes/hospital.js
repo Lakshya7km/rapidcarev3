@@ -7,6 +7,8 @@ const fs = require('fs');
 const Hospital = require('../models/Hospital');
 const { auth } = require('../middleware/auth');
 const { updateHospitalCoordinates } = require('../utils/coordinateExtractor');
+const { escapeHtml } = require('../utils/escapeHtml');
+const crypto = require('crypto');
 
 module.exports = (io) => {
   // List hospitals with optional filters
@@ -63,14 +65,18 @@ module.exports = (io) => {
     }
   });
 
-  router.post('/', async (req, res) => {
+  router.post('/', auth(['superadmin']), async (req, res) => {
     try {
       const payload = req.body;
+      const providedPassword = (payload.password || '').trim();
+      const tempPassword = providedPassword || crypto.randomBytes(9).toString('base64url');
+      payload.password = tempPassword;
+      payload.forcePasswordChange = true;
       const h = new Hospital(payload);
       // Extract and store coordinates from Google Maps URL if provided
       await updateHospitalCoordinates(h);
       await h.save();
-      res.json({ success: true, hospital: h });
+      res.json({ success: true, hospital: h, tempPassword: providedPassword ? undefined : tempPassword });
     } catch (err) {
       res.status(400).json({ success: false, message: err.message });
     }
@@ -288,7 +294,7 @@ module.exports = (io) => {
             </style>
           </head>
           <body>
-            <h2>Doctor Attendance - ${req.params.hospitalId}</h2>
+            <h2>Doctor Attendance - ${escapeHtml(req.params.hospitalId)}</h2>
             <p>Please enter your Doctor ID and select attendance type:</p>
             <form onsubmit="markAttendance(event)">
               <div class="form-group">
@@ -465,8 +471,11 @@ module.exports = (io) => {
   });
 
   // Call Logs
-  router.post('/:hospitalId/call-log', async (req, res) => {
+  router.post('/:hospitalId/call-log', auth(['hospital']), async (req, res) => {
     try {
+      if (req.user.role === 'hospital' && req.user.ref !== req.params.hospitalId) {
+        return res.status(403).json({ message: 'Forbidden' });
+      }
       const { callerName, callerMobile, reason } = req.body;
       const hospital = await Hospital.findOne({ hospitalId: req.params.hospitalId });
       if (!hospital) return res.status(404).json({ message: 'Hospital not found' });

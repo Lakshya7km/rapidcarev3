@@ -6,7 +6,8 @@ const Hospital = require('../models/Hospital');
 const Doctor = require('../models/Doctor');
 const Ambulance = require('../models/Ambulance');
 const EmergencyRequest = require('../models/EmergencyRequest');
-const { auth } = require('../middleware/auth');
+const { auth, getJwtSecret } = require('../middleware/auth');
+const crypto = require('crypto');
 
 // Super Admin Login
 router.post('/login', async (req, res) => {
@@ -19,7 +20,7 @@ router.post('/login', async (req, res) => {
         const isMatch = await bcrypt.compare(password, admin.password);
         if (!isMatch) return res.status(400).json({ message: 'Invalid credentials' });
 
-        const token = jwt.sign({ id: admin._id, role: 'superadmin' }, process.env.JWT_SECRET || 'devsecret');
+        const token = jwt.sign({ id: admin._id, role: 'superadmin', ref: admin.username }, getJwtSecret(), { expiresIn: '24h' });
         res.json({ token, admin: { username: admin.username } });
     } catch (e) {
         res.status(500).json({ message: e.message });
@@ -54,17 +55,21 @@ router.post('/register-hospital', auth(['superadmin']), async (req, res) => {
         const exists = await Hospital.findOne({ hospitalId });
         if (exists) return res.status(400).json({ message: 'Hospital ID already exists' });
 
+        const tempPassword = (typeof password === 'string' && password.trim() !== '')
+            ? password
+            : crypto.randomBytes(9).toString('base64url');
+
         const newHospital = new Hospital({
             hospitalId,
             contact,
-            password: password || 'test@1234', // Will be hashed by pre-save
+            password: tempPassword, // Will be hashed by pre-save
             location: { lat, lng },
             name,
             address
         });
 
         await newHospital.save();
-        res.json({ message: 'Hospital registered successfully', hospital: newHospital });
+        res.json({ message: 'Hospital registered successfully', hospital: newHospital, tempPassword: password ? undefined : tempPassword });
     } catch (e) {
         res.status(500).json({ message: e.message });
     }

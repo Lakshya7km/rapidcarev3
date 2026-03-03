@@ -18,7 +18,7 @@ const AmbulanceSchema = new mongoose.Schema(
       mobile: String,
       emtId: String,
     },
-    password: { type: String, default: 'test@1234' },
+    password: { type: String, required: true },
     forcePasswordChange: { type: Boolean, default: true },
     status: { type: String, enum: ['On Duty', 'Offline', 'In Transit'], default: 'Offline' },
     location: { lat: Number, lng: Number },

@@ -19,6 +19,31 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Basic in-memory rate limiter (best-effort; resets on restart)
+function rateLimit({ windowMs, max, keyGenerator }) {
+  const hits = new Map();
+  return (req, res, next) => {
+    try {
+      const now = Date.now();
+      const key = (keyGenerator ? keyGenerator(req) : req.ip) || req.ip;
+      const bucket = hits.get(key);
+      if (!bucket || now > bucket.resetAt) {
+        hits.set(key, { count: 1, resetAt: now + windowMs });
+        return next();
+      }
+      bucket.count += 1;
+      if (bucket.count > max) {
+        const retryAfterSeconds = Math.ceil((bucket.resetAt - now) / 1000);
+        res.setHeader('Retry-After', String(retryAfterSeconds));
+        return res.status(429).json({ message: 'Too many requests. Please try again later.' });
+      }
+      return next();
+    } catch (e) {
+      return next();
+    }
+  };
+}
+
 // Logging middleware - shows all requests in terminal
 app.use((req, res, next) => {
   const timestamp = new Date().toLocaleTimeString();
@@ -44,6 +69,7 @@ app.use((req, res, next) => {
 });
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use(express.static(path.join(__dirname, 'public')));
+app.use('/react', express.static(path.join(__dirname, 'public', 'react')));
 
 // connect mongo — uses Vercel-safe cached singleton (utils/db.js)
 // bufferCommands:false ensures we fail fast instead of buffering on serverless
@@ -182,9 +208,9 @@ app.use('/api/hospital', require('./routes/hospital')(io));
 app.use('/api/beds', require('./routes/beds')(io));
 app.use('/api/doctors', require('./routes/doctors')(io));
 app.use('/api/ambulances', require('./routes/ambulances')(io));
-app.use('/api/emergency', require('./routes/emergency')(io));
+app.use('/api/emergency', rateLimit({ windowMs: 60 * 1000, max: 60 }), require('./routes/emergency')(io));
 app.use('/api/nurse', require('./routes/nurse')(io)); // Nurse routes
-app.use('/api/auth', require('./routes/auth')(io));
+app.use('/api/auth', rateLimit({ windowMs: 60 * 1000, max: 20 }), require('./routes/auth')(io));
 app.use('/api/admin', require('./routes/admin')); // Admin routes (no io needed yet, or pass if needed)
 app.use('/api/master', require('./routes/master')); // Master CRUD routes
 app.use('/api/reset-db', require('./routes/reset')(io));
@@ -209,7 +235,49 @@ app.use((err, req, res, next) => {
 
 // Explicit root route handler
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  const reactIndex = path.join(__dirname, 'public', 'react', 'index.html');
+  const legacyIndex = path.join(__dirname, 'public', 'index.html');
+  try {
+    if (require('fs').existsSync(reactIndex)) {
+      return res.sendFile(reactIndex);
+    }
+  } catch (e) {
+    // ignore
+  }
+  return res.sendFile(legacyIndex);
+});
+
+// React SPA routes (served by the built UI when available)
+app.get(['/public', '/reception', '/doctor', '/ambulance', '/nurse', '/admin'], (req, res) => {
+  const reactIndex = path.join(__dirname, 'public', 'react', 'index.html');
+  try {
+    if (require('fs').existsSync(reactIndex)) {
+      return res.sendFile(reactIndex);
+    }
+  } catch (e) {
+    // ignore
+  }
+  return res.redirect('/');
+});
+
+// Generic React SPA fallback (deep links / refresh) when the UI is built.
+// Only applies to GET requests that are not API/static asset routes.
+app.get(/.*/, (req, res, next) => {
+  try {
+    if (req.method !== 'GET') return next();
+    if (req.path.startsWith('/api')) return next();
+    if (req.path.startsWith('/uploads')) return next();
+    if (req.path.startsWith('/react')) return next();
+    if (req.path.includes('.') ) return next();
+
+    const reactIndex = path.join(__dirname, 'public', 'react', 'index.html');
+    if (require('fs').existsSync(reactIndex)) {
+      return res.sendFile(reactIndex);
+    }
+  } catch (e) {
+    // ignore
+  }
+  return next();
 });
 
 // 404 handler

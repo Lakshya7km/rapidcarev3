@@ -2,6 +2,7 @@
 const express = require('express');
 const router = express.Router();
 const { auth } = require('../middleware/auth');
+const bcrypt = require('bcrypt');
 
 // Models
 const Hospital = require('../models/Hospital');
@@ -13,6 +14,7 @@ const Nurse = require('../models/Nurse');
 const Announcement = require('../models/Announcement');
 const BloodBank = require('../models/BloodBank');
 const CallLog = require('../models/CallLog');
+const SuperAdmin = require('../models/SuperAdmin');
 
 const models = {
     hospitals: Hospital,
@@ -23,7 +25,8 @@ const models = {
     nurses: Nurse,
     announcements: Announcement,
     bloodbank: BloodBank,
-    calllogs: CallLog
+    calllogs: CallLog,
+    superadmin: SuperAdmin
 };
 
 // Middleware to check if collection is valid
@@ -80,6 +83,16 @@ router.put('/:collection/:id', auth(['superadmin']), validateCollection, async (
         delete updateData.hospitalId;
         delete updateData.doctorId;
         delete updateData.ambulanceId;
+
+        // Ensure password updates remain hashed for models that store passwords
+        if (typeof updateData.password === 'string' && updateData.password.trim() !== '') {
+            const looksHashed = updateData.password.startsWith('$2b$');
+            if (!looksHashed) {
+                if (collection === 'superadmin' || collection === 'nurses') {
+                    updateData.password = await bcrypt.hash(updateData.password, 10);
+                }
+            }
+        }
 
         const updated = await model.findByIdAndUpdate(id, { $set: updateData }, { new: true });
 
