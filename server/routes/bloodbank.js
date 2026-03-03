@@ -9,13 +9,13 @@ router.get('/', async (req, res) => {
     } catch (e) { res.status(500).json({ message: e.message }); }
 });
 
-// Upsert by blood group (used by reception BloodBankSection)
+// Upsert by blood type (used by reception BloodBankSection)
 router.post('/upsert', async (req, res) => {
     try {
-        const { hospitalId, bloodGroup, units } = req.body;
-        let b = await BloodBank.findOne({ hospitalId, bloodGroup });
+        const { hospitalId, bloodType, units } = req.body;
+        let b = await BloodBank.findOne({ hospitalId, bloodType });
         if (b) { b.units = units; await b.save(); }
-        else { b = await new BloodBank({ hospitalId, bloodGroup, units }).save(); }
+        else { b = await new BloodBank({ hospitalId, bloodType, units }).save(); }
         res.json(b);
     } catch (e) { res.status(500).json({ message: e.message }); }
 });

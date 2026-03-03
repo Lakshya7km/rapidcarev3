@@ -291,6 +291,20 @@ export default function PublicPortal() {
                                 </div>
                             )}
 
+                            {selected.gallery && selected.gallery.length > 0 && (
+                                <div style={{ marginTop: '1rem' }}>
+                                    <strong style={{ fontSize: '0.9rem', display: 'block', marginBottom: 8 }}>🖼️ Hospital Photos:</strong>
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
+                                        {selected.gallery.map((url, i) => (
+                                            <img key={i} src={url} alt={`${selected.name} photo`}
+                                                style={{ width: '100%', aspectRatio: '4/3', objectFit: 'cover', borderRadius: 8, border: '1px solid #e3e6f0' }}
+                                                onError={e => { e.target.style.display = 'none' }}
+                                            />
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
                             {docSummary[selected.hospitalId] && docSummary[selected.hospitalId].length > 0 && (
                                 <div style={{ marginTop: '1rem' }}>
                                     <strong style={{ fontSize: '0.9rem', display: 'block', marginBottom: 8 }}>👨‍⚕️ Medical Staff:</strong>

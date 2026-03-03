@@ -22,7 +22,7 @@ export default function BloodBankSection({ hospitalId }) {
                 setInventory(r.data)
                 // Pre-fill editing with current values
                 const map = {}
-                r.data.forEach(i => { map[i.bloodGroup] = String(i.units) })
+                r.data.forEach(i => { map[i.bloodType] = String(i.units) })
                 setEditing(map)
             })
             .finally(() => setLoading(false))
@@ -36,7 +36,7 @@ export default function BloodBankSection({ hospitalId }) {
             await Promise.all(BLOOD_TYPES.map(bg =>
                 api.post('/bloodbank/upsert', {
                     hospitalId,
-                    bloodGroup: bg,
+                    bloodType: bg,
                     units: parseInt(editing[bg] || '0', 10)
                 })
             ))
@@ -53,7 +53,7 @@ export default function BloodBankSection({ hospitalId }) {
 
     // Build full grid always showing all 8 blood types
     const invMap = {}
-    inventory.forEach(i => { invMap[i.bloodGroup] = i.units })
+    inventory.forEach(i => { invMap[i.bloodType] = i.units })
 
     const totalUnits = Object.values(invMap).reduce((a, b) => a + b, 0)
     const availableTypes = Object.values(invMap).filter(u => u > 0).length
