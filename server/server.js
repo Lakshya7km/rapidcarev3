@@ -32,6 +32,13 @@ app.use('/api/bloodbank', require('./routes/bloodbank'));
 app.use('/api/announcements', require('./routes/announcements'));
 app.use('/api/admin', require('./routes/admin'));
 
+// Serve React frontend in production
+const clientBuildPath = path.join(__dirname, '../client/dist');
+app.use(express.static(clientBuildPath));
+app.get('*', (req, res) => {
+    res.sendFile(path.join(clientBuildPath, 'index.html'));
+});
+
 // Socket.io
 io.on('connection', (socket) => {
     // Join rooms
