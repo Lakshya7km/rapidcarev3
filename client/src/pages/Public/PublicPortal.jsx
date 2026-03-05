@@ -14,8 +14,15 @@ export default function PublicPortal() {
     const [selected, setSelected] = useState(null)
     const [bedSummary, setBedSummary] = useState({})
     const [docSummary, setDocSummary] = useState({})
+    const [bloodStock, setBloodStock] = useState({})
+    const [fetchedAt, setFetchedAt] = useState({}) // { hospitalId: Date }
+    const [announcements, setAnnouncements] = useState({})
     const [userPos, setUserPos] = useState(null)
     const [loading, setLoading] = useState(true)
+
+    const [showDonateForm, setShowDonateForm] = useState(false)
+    const [donateForm, setDonateForm] = useState({ name: '', bloodType: 'A+', contact: '', city: '', hospitalId: '' })
+    const [donateMsg, setDonateMsg] = useState('')
 
     useEffect(() => {
         api.get('/hospitals').then(r => { setHospitals(r.data); setFiltered(r.data) }).finally(() => setLoading(false))
@@ -47,14 +54,33 @@ export default function PublicPortal() {
         // Parallel fetch for beds and docs
         f.forEach(h => {
             if (!bedSummary[h.hospitalId]) {
+                const now = new Date()
                 api.get(`/beds/summary/${h.hospitalId}`).then(r => setBedSummary(prev => ({ ...prev, [h.hospitalId]: r.data }))).catch(() => { })
                 api.get(`/doctors?hospitalId=${h.hospitalId}`).then(r => setDocSummary(prev => ({ ...prev, [h.hospitalId]: r.data }))).catch(() => { })
+                api.get(`/bloodbank?hospitalId=${h.hospitalId}`).then(r => {
+                    setBloodStock(prev => ({ ...prev, [h.hospitalId]: r.data }))
+                    setFetchedAt(prev => ({ ...prev, [h.hospitalId]: now }))
+                }).catch(() => { })
+                api.get(`/announcements?hospitalId=${h.hospitalId}`).then(r => setAnnouncements(prev => ({ ...prev, [h.hospitalId]: r.data }))).catch(() => { })
             }
         })
     }, [search, hospitals, userPos])
 
+    const submitDonation = async (e) => {
+        e.preventDefault()
+        try {
+            await api.post('/bloodbank/donors', donateForm)
+            setDonateMsg('Donation request submitted successfully! The hospital will contact you shortly.')
+            setTimeout(() => { setShowDonateForm(false); setDonateMsg('') }, 3000)
+            setDonateForm({ name: '', bloodType: 'A+', contact: '', city: '', hospitalId: '' })
+        } catch (err) {
+            setDonateMsg('Failed to submit request. Please try again.')
+        }
+    }
+
     const openDetail = async (h) => {
         setSelected(h)
+        setDonateForm({ ...donateForm, hospitalId: h.hospitalId, city: h.address?.city || '' })
         document.getElementById('hospital-modal').style.display = 'flex'
     }
 
@@ -182,6 +208,16 @@ export default function PublicPortal() {
 
                             const d = docSummary[h.hospitalId] || []
                             const docs = d.filter(doc => doc.availability === 'Present').slice(0, 2)
+                            const blood = bloodStock[h.hospitalId] || []
+                            const availableBlood = blood.filter(bk => bk.units > 0)
+
+                            const ft = fetchedAt[h.hospitalId]
+                            const updatedAgo = ft ? (() => {
+                                const m = Math.floor((Date.now() - new Date(ft)) / 60000)
+                                if (m < 1) return 'just now'
+                                if (m < 60) return `${m}m ago`
+                                return `${Math.floor(m / 60)}h ago`
+                            })() : null
 
                             return (
                                 <div key={h.hospitalId} style={{ background: 'white', borderRadius: 16, border: '1px solid rgba(0,0,0,0.05)', boxShadow: '0 4px 15px rgba(0,0,0,0.03)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
@@ -210,9 +246,30 @@ export default function PublicPortal() {
                                         </div>
 
                                         <div style={{ paddingTop: '1rem', borderTop: '1px solid #f8f9fa' }}>
+                                            {/* Blood stock mini */}
+                                            {availableBlood.length > 0 && (
+                                                <div style={{ marginBottom: 8 }}>
+                                                    <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#6c757d', textTransform: 'uppercase', marginBottom: 4 }}>🩸 Blood Available</div>
+                                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                                                        {availableBlood.slice(0, 6).map(bk => (
+                                                            <span key={bk.bloodType} style={{ background: '#fee2e2', color: '#dc2626', padding: '2px 7px', borderRadius: 6, fontSize: '0.7rem', fontWeight: 700 }}>
+                                                                {bk.bloodType}: {bk.units}
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+                                            {/* Doctors */}
+                                            <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#6c757d', textTransform: 'uppercase', marginBottom: 4 }}>👨‍⚕️ Medical Staff</div>
                                             {d.length > 0 ? docs.length > 0 ? docs.map(doc => (
-                                                <div key={doc._id} style={{ fontSize: '0.85rem', fontWeight: 700 }}>👨‍⚕️ {doc.name}</div>
-                                            )) : <small className="text-muted">No doctors currently present</small> : <small className="text-muted">Syncing staff...</small>}
+                                                <div key={doc._id} style={{ fontSize: '0.83rem', fontWeight: 600, marginBottom: 2 }}>
+                                                    👨‍⚕️ {doc.name} <span style={{ fontWeight: 400, color: '#6c757d', fontSize: '0.75rem' }}>{doc.specialty || doc.specialization || ''}</span>
+                                                </div>
+                                            )) : <small style={{ color: '#6c757d' }}>No doctors currently present</small> : <small style={{ color: '#6c757d' }}>Syncing staff...</small>}
+                                            {/* Last updated */}
+                                            {updatedAgo && (
+                                                <div style={{ fontSize: '0.68rem', color: '#9ca3af', marginTop: 6 }}>⏱ Data fetched {updatedAgo}</div>
+                                            )}
                                         </div>
                                     </div>
 
@@ -244,7 +301,10 @@ export default function PublicPortal() {
                                     <strong style={{ fontSize: '0.9rem' }}>📍 Full Address:</strong>
                                     <p style={{ margin: 0, fontSize: '0.9rem', color: '#6c757d' }}>{selected.address?.street}, {selected.address?.city}, {selected.address?.state}</p>
                                 </div>
-                                <button className="btn btn-primary btn-sm rounded-pill" onClick={() => navigateToHospital(selected.location, selected.name)}>🚀 Directions</button>
+                                <div style={{ display: 'flex', gap: 8, flexDirection: 'column', alignItems: 'flex-end' }}>
+                                    <button className="btn btn-primary btn-sm rounded-pill" onClick={() => navigateToHospital(selected.location, selected.name)}>🚀 Directions</button>
+                                    <button className="btn btn-danger btn-sm rounded-pill font-bold" onClick={() => setShowDonateForm(true)}>❤ Donate Blood</button>
+                                </div>
                             </div>
 
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
@@ -276,9 +336,29 @@ export default function PublicPortal() {
                                 </div>
                             )}
 
+                            {announcements[selected.hospitalId] && announcements[selected.hospitalId].length > 0 && (
+                                <div style={{ marginBottom: '1rem' }}>
+                                    <strong style={{ fontSize: '0.9rem', display: 'block', marginBottom: 8 }}>📢 Important Announcements:</strong>
+                                    {announcements[selected.hospitalId].map(a => (
+                                        <div key={a._id} style={{ padding: '10px 14px', borderRadius: 8, marginBottom: 8, borderLeft: `4px solid ${a.priority === 'Urgent' ? '#ef4444' : a.priority === 'High' ? '#f59e0b' : '#3b82f6'}`, background: a.priority === 'Urgent' ? '#fef2f2' : a.priority === 'High' ? '#fffbeb' : '#eff6ff' }}>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                                                <strong style={{ fontSize: '0.9rem', color: a.priority === 'Urgent' ? '#991b1b' : a.priority === 'High' ? '#92400e' : '#1e40af' }}>{a.title}</strong>
+                                                <span style={{ fontSize: '0.7rem', color: 'var(--text3)' }}>{new Date(a.createdAt).toLocaleDateString()}</span>
+                                            </div>
+                                            <div style={{ fontSize: '0.85rem', color: '#334155' }}>{a.content}</div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
                             {bedSummary[selected.hospitalId] && (
                                 <div style={{ background: '#f8f9fa', padding: '1rem', borderRadius: 8, marginTop: '1rem' }}>
-                                    <strong style={{ fontSize: '0.9rem', display: 'block', marginBottom: 12 }}>🛏️ Bed Statistics:</strong>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                                        <strong style={{ fontSize: '0.9rem', display: 'block' }}>🛏️ Bed Statistics:</strong>
+                                        <span style={{ fontSize: '0.75rem', color: '#6c757d', fontWeight: 500 }}>
+                                            {fetchedAt[selected.hospitalId] ? `Updated: ${new Date(fetchedAt[selected.hospitalId]).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}` : ''}
+                                        </span>
+                                    </div>
                                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))', gap: 12 }}>
 
                                         {Object.entries(bedSummary[selected.hospitalId]).map(([type, stats]) => (
@@ -287,6 +367,27 @@ export default function PublicPortal() {
                                                 <div style={{ fontSize: '0.75rem', color: '#6c757d' }}>{type}</div>
                                             </div>
                                         ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {bloodStock[selected.hospitalId] && bloodStock[selected.hospitalId].length > 0 && (
+                                <div style={{ background: '#f8f9fa', padding: '1rem', borderRadius: 8, marginTop: '1rem' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                                        <strong style={{ fontSize: '0.9rem', display: 'block' }}>🩸 Blood Availability:</strong>
+                                        <span style={{ fontSize: '0.75rem', color: '#6c757d', fontWeight: 500 }}>
+                                            {fetchedAt[selected.hospitalId] ? `Updated: ${new Date(fetchedAt[selected.hospitalId]).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}` : ''}
+                                        </span>
+                                    </div>
+                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                                        {bloodStock[selected.hospitalId].filter(b => b.units > 0).map(b => (
+                                            <div key={b._id} style={{ background: '#dc2626', color: 'white', padding: '4px 8px', borderRadius: 6, fontSize: '0.85rem', fontWeight: 700 }}>
+                                                {b.bloodType}: {b.units} <span style={{ fontSize: '0.7rem', fontWeight: 500 }}>u</span>
+                                            </div>
+                                        ))}
+                                        {bloodStock[selected.hospitalId].filter(b => b.units > 0).length === 0 && (
+                                            <span style={{ fontSize: '0.85rem', color: '#6c757d' }}>No active blood stock available.</span>
+                                        )}
                                     </div>
                                 </div>
                             )}
@@ -310,10 +411,22 @@ export default function PublicPortal() {
                                     <strong style={{ fontSize: '0.9rem', display: 'block', marginBottom: 8 }}>👨‍⚕️ Medical Staff:</strong>
                                     {docSummary[selected.hospitalId].map(d => (
                                         <div key={d._id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 0', borderBottom: '1px solid #f8f9fa' }}>
-                                            <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#e9ecef', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem' }}>👨‍⚕️</div>
-                                            <div>
-                                                <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>{d.name}</div>
-                                                <div style={{ color: '#6c757d', fontSize: '0.8rem' }}>{d.speciality}</div>
+                                            <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#e9ecef', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem', position: 'relative' }}>
+                                                👨‍⚕️
+                                            </div>
+                                            <div style={{ flex: 1 }}>
+                                                <div style={{ fontWeight: 600, fontSize: '0.9rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                    {d.name}
+                                                    <span style={{ background: d.availability === 'Available' ? '#dcfce7' : d.availability === 'Unavailable' ? '#fee2e2' : '#fef3c7', color: d.availability === 'Available' ? '#166534' : d.availability === 'Unavailable' ? '#991b1b' : '#92400e', padding: '2px 8px', borderRadius: 12, fontSize: '0.7rem', fontWeight: 700 }}>
+                                                        {d.availability === 'Available' ? 'Available' : d.availability === 'Unavailable' ? 'Absent' : 'On Leave'}
+                                                    </span>
+                                                </div>
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 2 }}>
+                                                    <span style={{ color: '#6c757d', fontSize: '0.8rem' }}>{d.specialization || d.speciality || 'General'}</span>
+                                                    <span style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 500 }}>
+                                                        {d.updatedAt ? `Updated: ${new Date(d.updatedAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}` : ''}
+                                                    </span>
+                                                </div>
                                             </div>
                                         </div>
                                     ))}
@@ -325,6 +438,59 @@ export default function PublicPortal() {
                 </div>
             </div>
 
+            {/* Donate Blood Modal */}
+            {showDonateForm && (
+                <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 3000, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setShowDonateForm(false)}>
+                    <div style={{ background: 'white', padding: '2rem', borderRadius: 16, width: '90%', maxWidth: 450, position: 'relative' }} onClick={e => e.stopPropagation()}>
+                        <button style={{ position: 'absolute', top: 16, right: 16, border: 'none', background: 'transparent', fontSize: '1.2rem', cursor: 'pointer' }} onClick={() => setShowDonateForm(false)}>✕</button>
+
+                        <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
+                            <div style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}>🩸</div>
+                            <h3 style={{ margin: 0, fontWeight: 700, color: '#dc2626' }}>Blood Donation Request</h3>
+                            <p style={{ margin: 0, fontSize: '0.9rem', color: '#6c757d', marginTop: 4 }}>Your single donation can save up to 3 lives.</p>
+                        </div>
+
+                        {donateMsg && <div style={{ background: donateMsg.includes('success') ? '#dcfce7' : '#fee2e2', color: donateMsg.includes('success') ? '#166534' : '#991b1b', padding: '12px', borderRadius: 8, marginBottom: '1rem', fontSize: '0.9rem', textAlign: 'center', fontWeight: 500 }}>{donateMsg}</div>}
+
+                        <form onSubmit={submitDonation}>
+                            <div className="form-group" style={{ marginBottom: 12 }}>
+                                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: 4 }}>Select Hospital Center *</label>
+                                <select required style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #ced4da', fontSize: '0.95rem' }} value={donateForm.hospitalId} onChange={e => setDonateForm({ ...donateForm, hospitalId: e.target.value })}>
+                                    <option value="" disabled>Select nearest hospital</option>
+                                    {hospitals.map(h => <option key={h.hospitalId} value={h.hospitalId}>{h.name} ({h.address?.city})</option>)}
+                                </select>
+                            </div>
+
+                            <div className="form-group" style={{ marginBottom: 12 }}>
+                                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: 4 }}>Full Name *</label>
+                                <input required type="text" style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #ced4da', fontSize: '0.95rem' }} value={donateForm.name} onChange={e => setDonateForm({ ...donateForm, name: e.target.value })} />
+                            </div>
+
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+                                <div className="form-group">
+                                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: 4 }}>Blood Group *</label>
+                                    <select style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #ced4da', fontSize: '0.95rem' }} value={donateForm.bloodType} onChange={e => setDonateForm({ ...donateForm, bloodType: e.target.value })}>
+                                        {['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'].map(type => <option key={type} value={type}>{type}</option>)}
+                                    </select>
+                                </div>
+                                <div className="form-group">
+                                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: 4 }}>Contact Number *</label>
+                                    <input required type="tel" pattern="[6-9][0-9]{9}" title="Enter a valid 10-digit Indian mobile number" placeholder="e.g. 9876543210" style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #ced4da', fontSize: '0.95rem' }} value={donateForm.contact} onChange={e => setDonateForm({ ...donateForm, contact: e.target.value })} />
+                                </div>
+                            </div>
+
+                            <div className="form-group" style={{ marginBottom: 20 }}>
+                                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: 4 }}>City *</label>
+                                <input required type="text" style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #ced4da', fontSize: '0.95rem' }} value={donateForm.city} onChange={e => setDonateForm({ ...donateForm, city: e.target.value })} />
+                            </div>
+
+                            <button type="submit" className="btn btn-primary" style={{ width: '100%', background: '#dc2626', border: 'none', padding: '12px', fontSize: '1rem', fontWeight: 700, borderRadius: 8 }}>
+                                Submit Details
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }

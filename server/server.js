@@ -29,19 +29,16 @@ app.use('/api/ambulances', require('./routes/ambulances'));
 app.use('/api/beds', require('./routes/beds'));
 app.use('/api/emergency', require('./routes/emergency'));
 app.use('/api/bloodbank', require('./routes/bloodbank'));
+app.use('/api/eraktkosh', require('./routes/eraktkosh'));
 app.use('/api/announcements', require('./routes/announcements'));
 app.use('/api/admin', require('./routes/admin'));
 
-<<<<<<< HEAD
 // Serve React frontend in production
 const clientBuildPath = path.join(__dirname, '../client/dist');
 app.use(express.static(clientBuildPath));
 app.get('*', (req, res) => {
     res.sendFile(path.join(clientBuildPath, 'index.html'));
 });
-
-=======
->>>>>>> 249ac1ed861c4486288be8b5560101ae79ca1d7c
 // Socket.io
 io.on('connection', (socket) => {
     // Join rooms

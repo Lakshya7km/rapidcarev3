@@ -2,17 +2,13 @@
     "name": "rapidcare-mern",
     "version": "1.0.0",
     "scripts": {
-<<<<<<< HEAD
         "start": "cd server && npm start",
         "postinstall": "cd server && npm install && cd ../client && npm install && npm run build",
-=======
->>>>>>> 249ac1ed861c4486288be8b5560101ae79ca1d7c
         "dev": "concurrently \"npm run server\" \"npm run client\"",
         "server": "cd server && npm run dev",
         "client": "cd client && npm run dev",
         "seed": "cd server && npm run seed"
     },
-<<<<<<< HEAD
     "dependencies": {
         "bcrypt": "^6.0.0",
         "cors": "^2.8.5",
@@ -27,9 +23,5 @@
     "devDependencies": {
         "concurrently": "^8.2.2",
         "nodemon": "^3.0.2"
-=======
-    "devDependencies": {
-        "concurrently": "^8.2.2"
->>>>>>> 249ac1ed861c4486288be8b5560101ae79ca1d7c
     }
 }

@@ -20,7 +20,11 @@ export default function AmbulancesSection({ hospitalId }) {
     const [hospital, setHospital] = useState(null)
     const [emergencies, setEmergencies] = useState([])
     const [selected, setSelected] = useState(null) // selected ambulance for detail
+    const [editingEmt, setEditingEmt] = useState(null)
+    const [editEmtForm, setEditEmtForm] = useState({ name: '', mobile: '' })
     const [form, setForm] = useState({ ambulanceId: '', vehicleNumber: '', emt: { name: '', emtId: '', mobile: '' }, pilot: { name: '', pilotId: '', mobile: '' } })
+    const [assigningTask, setAssigningTask] = useState(null)
+    const [taskString, setTaskString] = useState('')
 
     const load = () => {
         api.get(`/ambulances?hospitalId=${hospitalId}`).then(r => setAmbulances(r.data)).finally(() => setLoading(false))
@@ -50,9 +54,26 @@ export default function AmbulancesSection({ hospitalId }) {
     }, [])
 
     const create = async () => {
-        await api.post('/ambulances', { ...form, hospitalId })
-        setAdding(false); load()
-        setForm({ ambulanceId: '', vehicleNumber: '', emt: { name: '', emtId: '', mobile: '' }, pilot: { name: '', pilotId: '', mobile: '' } })
+        try {
+            await api.post('/ambulances', { ...form, ambulanceNumber: form.vehicleNumber, hospitalId })
+            setAdding(false); load()
+            setForm({ ambulanceId: '', vehicleNumber: '', emt: { name: '', emtId: '', mobile: '' }, pilot: { name: '', pilotId: '', mobile: '' } })
+        } catch (err) {
+            alert(err.response?.data?.message || 'Failed to register ambulance. Check if ID already exists.')
+        }
+    }
+
+    const saveEmt = async () => {
+        if (!editingEmt) return
+        await api.put(`/ambulances/${editingEmt.ambulanceId}`, { emt: { ...editingEmt.emt, ...editEmtForm } })
+        setEditingEmt(null); load()
+    }
+
+    const assignTask = async () => {
+        if (!assigningTask) return
+        await api.put(`/ambulances/${assigningTask.ambulanceId}`, { assignedTask: taskString })
+        setAssigningTask(null); setTaskString('')
+        load()
     }
 
     const getAmbulanceEmergency = (ambulanceId) => emergencies.find(e => e.ambulanceId === ambulanceId)
@@ -111,10 +132,14 @@ export default function AmbulancesSection({ hospitalId }) {
                             <div>
                                 <div style={{ fontWeight: 700 }}>🚑 {a.ambulanceId} <span style={{ fontWeight: 400, color: 'var(--text2)' }}>· {a.vehicleNumber}</span></div>
                                 <div style={{ fontSize: 12, color: 'var(--text2)', marginTop: 2 }}>
-                                    EMT: {a.emt?.name || '—'} · Pilot: {a.pilot?.name || '—'}
+                                    <span>Pilot (Locked): <strong>{a.pilot?.name || '—'}</strong> </span> <br />
+                                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
+                                        EMT: <strong>{a.emt?.name || '—'}</strong>
+                                        <button className="btn btn-ghost btn-sm" style={{ padding: '2px 4px', fontSize: 10, height: 'auto', minHeight: 0 }} onClick={() => { setEditingEmt(a); setEditEmtForm({ name: a.emt?.name || '', mobile: a.emt?.mobile || '' }) }}>Edit</button>
+                                    </span>
                                 </div>
                                 {loc?.lat && (
-                                    <div style={{ fontSize: 11, color: 'var(--primary)', display: 'flex', gap: 4, alignItems: 'center', marginTop: 2 }}>
+                                    <div style={{ fontSize: 11, color: 'var(--primary)', display: 'flex', gap: 4, alignItems: 'center', marginTop: 4 }}>
                                         📍 {loc.lat.toFixed(4)}, {loc.lng.toFixed(4)}
                                         {sec !== null && <span style={{ color: 'var(--text3)' }}>({sec}s ago)</span>}
                                         {!locations[a.ambulanceId] && <span style={{ color: 'var(--text3)' }}>(last known)</span>}
@@ -145,6 +170,19 @@ export default function AmbulancesSection({ hospitalId }) {
                         {!emergency && (
                             <div style={{ fontSize: 12, color: 'var(--text3)', fontStyle: 'italic' }}>No active assignment</div>
                         )}
+
+                        {/* Task Assignment */}
+                        <div style={{ marginTop: 8, padding: '8px 12px', background: '#f8f9fa', borderRadius: 8, border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div>
+                                <span style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Current Task</span>
+                                <div style={{ fontSize: 13, fontWeight: a.assignedTask ? 600 : 400, color: a.assignedTask ? '#1e293b' : '#94a3b8' }}>
+                                    {a.assignedTask || 'Not assigned by hospital'}
+                                </div>
+                            </div>
+                            <button className="btn btn-sm btn-outline" onClick={() => { setAssigningTask(a); setTaskString(a.assignedTask || '') }}>
+                                Assign
+                            </button>
+                        </div>
                     </div>
                 )
             })}
@@ -184,6 +222,50 @@ export default function AmbulancesSection({ hospitalId }) {
                     </div>
                 </div>
             )}
+
+            {/* Edit EMT Modal */}
+            {editingEmt && (
+                <div className="modal-overlay" onClick={() => setEditingEmt(null)}>
+                    <div className="modal" onClick={e => e.stopPropagation()}>
+                        <div className="modal-header">
+                            <span className="modal-title">Edit EMT Detail - {editingEmt.ambulanceId}</span>
+                            <button className="btn btn-ghost btn-icon" onClick={() => setEditingEmt(null)}><X size={18} /></button>
+                        </div>
+                        <div className="form-group">
+                            <label className="form-label">EMT Name</label>
+                            <input className="form-input" value={editEmtForm.name} onChange={e => setEditEmtForm(p => ({ ...p, name: e.target.value }))} />
+                        </div>
+                        <div className="form-group">
+                            <label className="form-label">EMT Mobile</label>
+                            <input className="form-input" value={editEmtForm.mobile} onChange={e => setEditEmtForm(p => ({ ...p, mobile: e.target.value }))} />
+                        </div>
+                        <button className="btn btn-primary btn-full" onClick={saveEmt}>Save Details</button>
+                    </div>
+                </div>
+            )}
+
+            {/* Task Assign Modal */}
+            {assigningTask && (
+                <div className="modal-overlay" onClick={() => { setAssigningTask(null); setTaskString('') }}>
+                    <div className="modal" onClick={e => e.stopPropagation()}>
+                        <div className="modal-header">
+                            <span className="modal-title">Assign Task — {assigningTask.ambulanceId}</span>
+                            <button className="btn btn-ghost btn-icon" onClick={() => { setAssigningTask(null); setTaskString('') }}><X size={18} /></button>
+                        </div>
+                        <div className="form-group">
+                            <label className="form-label">Task Description</label>
+                            <input className="form-input" placeholder="e.g. Pick up Oxygen from Depot" value={taskString} onChange={e => setTaskString(e.target.value)} />
+                        </div>
+                        <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+                            <button className="btn btn-primary" style={{ flex: 1 }} onClick={assignTask}>Update Task</button>
+                            {assigningTask.assignedTask && (
+                                <button className="btn btn-danger" onClick={() => { setTaskString(''); setTimeout(assignTask, 0) }}>Clear</button>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
         </div>
     )
 }

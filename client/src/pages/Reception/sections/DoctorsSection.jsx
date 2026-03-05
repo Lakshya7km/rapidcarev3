@@ -20,10 +20,20 @@ export default function DoctorsSection({ hospitalId }) {
         setForm({ doctorId: '', name: '', speciality: '', qualification: '', experience: '' })
     }
 
-    const toggleAvailability = async (doc) => {
-        const next = doc.availability === 'Available' ? 'Unavailable' : 'Available'
-        await api.put(`/doctors/${doc.doctorId}`, { availability: next })
-        setDocs(d => d.map(x => x.doctorId === doc.doctorId ? { ...x, availability: next } : x))
+    const toggleAvailability = async (doc, forceStatus) => {
+        const next = forceStatus || (doc.availability === 'Available' ? 'Unavailable' : 'Available')
+        await api.post(`/doctors/attendance-override`, { doctorId: doc.doctorId, hospitalId, availability: next === 'Available' ? 'Present' : 'Absent' })
+        load() // Refresh to get latest 'lastUpdated' from backend
+    }
+
+    const getRelativeTime = (d) => {
+        if (!d) return ''
+        const diff = Math.floor((new Date() - new Date(d)) / 60000)
+        if (diff < 1) return 'Just now'
+        if (diff < 60) return `${diff} mins ago`
+        const hours = Math.floor(diff / 60)
+        if (hours < 24) return `${hours} hrs ago`
+        return `${Math.floor(hours / 24)} days ago`
     }
 
     if (loading) return <div className="loader-center"><div className="spinner" /></div>
@@ -47,18 +57,18 @@ export default function DoctorsSection({ hospitalId }) {
                             <div style={{ fontSize: 12, color: 'var(--text2)' }}>{d.doctorId} · {d.speciality}</div>
                             <div style={{ fontSize: 11, color: 'var(--text3)' }}>{d.qualification} · {d.experience}</div>
                         </div>
-                        <button
-                            className="btn btn-sm"
-                            style={{
-                                background: (AVAIL_COLOR[d.availability || 'Unavailable']) + '20',
-                                color: AVAIL_COLOR[d.availability || 'Unavailable'],
-                                border: `1.5px solid ${AVAIL_COLOR[d.availability || 'Unavailable']}`,
-                                fontSize: 11, fontWeight: 600, borderRadius: 8, padding: '4px 10px'
-                            }}
-                            onClick={() => toggleAvailability(d)}
-                        >
-                            {d.availability || 'Unavailable'}
-                        </button>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-end' }}>
+                            <div style={{ display: 'flex', gap: 6 }}>
+                                <button className="btn btn-sm btn-success" style={{ padding: '4px 8px', fontSize: 11 }} onClick={() => toggleAvailability(d, 'Available')}>Present</button>
+                                <button className="btn btn-sm btn-outline" style={{ padding: '4px 8px', fontSize: 11, borderColor: '#ef4444', color: '#ef4444' }} onClick={() => toggleAvailability(d, 'Unavailable')}>Absent</button>
+                            </div>
+                            <div style={{ fontSize: 11, color: 'var(--text3)' }}>
+                                {d.lastUpdated ? `Updated: ${getRelativeTime(d.lastUpdated)}` : 'No activity today'}
+                            </div>
+                            <span className="badge" style={{ background: (AVAIL_COLOR[d.availability || 'Unavailable']) + '20', color: AVAIL_COLOR[d.availability || 'Unavailable'], fontSize: 10 }}>
+                                {d.availability || 'Unavailable'}
+                            </span>
+                        </div>
                     </div>
                 </div>
             ))}

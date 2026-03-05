@@ -12,9 +12,15 @@ const emergencySchema = new mongoose.Schema({
     emergencyType: String,
     equipment: String,
     symptoms: String,
+    ambulanceNotes: String, // from ambulance UI
+    condition: String, // from ambulance UI
     reason: String,
-    status: { type: String, enum: ['Pending', 'Accepted', 'Denied', 'Transferred', 'Admitted'], default: 'Pending' },
+    denialReason: String, // added by reception
+    assignedDoctor: String, // added by reception
+    replyMessage: String, // added by reception
+    status: { type: String, enum: ['Pending', 'Accepted', 'Rejected', 'Transferred', 'Admitted', 'En Route', 'Arrived', 'Referred', 'Completed'], default: 'Pending' },
     transferredTo: String,
+    referredFrom: String, // Source hospital that transferred the patient
     bedId: String,
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now }

@@ -11,6 +11,7 @@ const ambulanceSchema = new mongoose.Schema({
     location: { lat: Number, lng: Number, updatedAt: Date },
     emt: { name: String, emtId: String, mobile: String },
     pilot: { name: String, pilotId: String, mobile: String },
+    assignedTask: String, // Dynamic task assigned by reception
     forcePasswordChange: { type: Boolean, default: false },
     lastLogin: Date,
     createdAt: { type: Date, default: Date.now }

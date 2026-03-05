@@ -9,7 +9,6 @@ router.get('/', async (req, res) => {
     } catch (e) { res.status(500).json({ message: e.message }); }
 });
 
-<<<<<<< HEAD
 // Upsert by blood type (used by reception BloodBankSection)
 router.post('/upsert', async (req, res) => {
     try {
@@ -17,16 +16,38 @@ router.post('/upsert', async (req, res) => {
         let b = await BloodBank.findOne({ hospitalId, bloodType });
         if (b) { b.units = units; await b.save(); }
         else { b = await new BloodBank({ hospitalId, bloodType, units }).save(); }
-=======
-// Upsert by blood group (used by reception BloodBankSection)
-router.post('/upsert', async (req, res) => {
-    try {
-        const { hospitalId, bloodGroup, units } = req.body;
-        let b = await BloodBank.findOne({ hospitalId, bloodGroup });
-        if (b) { b.units = units; await b.save(); }
-        else { b = await new BloodBank({ hospitalId, bloodGroup, units }).save(); }
->>>>>>> 249ac1ed861c4486288be8b5560101ae79ca1d7c
         res.json(b);
+    } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+const Donor = require('../models/Donor');
+
+// Get donors for a hospital
+router.get('/donors', async (req, res) => {
+    try {
+        const { hospitalId } = req.query;
+        res.json(await Donor.find(hospitalId ? { hospitalId } : {}).sort({ createdAt: -1 }));
+    } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+// Submit a new donor request (from Public page)
+router.post('/donors', async (req, res) => {
+    try {
+        const d = new Donor(req.body);
+        await d.save();
+        res.json(d);
+    } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+// Update donor status (Reception)
+router.put('/donors/:id', auth(['hospital']), async (req, res) => {
+    try {
+        const d = await Donor.findByIdAndUpdate(
+            req.params.id,
+            { ...req.body, updatedAt: new Date() },
+            { new: true }
+        );
+        res.json(d);
     } catch (e) { res.status(500).json({ message: e.message }); }
 });
 

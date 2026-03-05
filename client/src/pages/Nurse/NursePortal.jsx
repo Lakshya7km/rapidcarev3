@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+﻿import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import api from '../../lib/api'
@@ -9,6 +9,15 @@ import QRScanner from '../../components/QRScanner'
 const STATUS_COLORS = { Vacant: '#22c55e', Occupied: '#ef4444', Reserved: '#f59e0b', Cleaning: '#8b5cf6' }
 const STATUSES = ['Vacant', 'Occupied', 'Reserved', 'Cleaning']
 const BED_TYPES = ['All Types', 'General', 'ICU', 'Private', 'Emergency', 'HDU', 'Day Care']
+
+const timeSince = (date) => {
+    if (!date) return null
+    const mins = Math.floor((Date.now() - new Date(date)) / 60000)
+    if (mins < 1) return 'just now'
+    if (mins < 60) return `${mins}m ago`
+    if (mins < 1440) return `${Math.floor(mins / 60)}h ago`
+    return `${Math.floor(mins / 1440)}d ago`
+}
 const TABS = [
     { key: 'beds', label: 'Ward', icon: BedDouble },
     { key: 'profile', label: 'Profile', icon: UserRound },
@@ -73,7 +82,7 @@ export default function NursePortal() {
         setBeds(b => b.map(x => x.bedId === bedId ? { ...x, status, patientName: status === 'Occupied' ? patientName : null } : x))
         socket.emit('bed:update', { hospitalId: user?.hospitalId, bedId })
         setSelected(null); setPatientName('')
-        setMsg(`✓ Bed ${bedId} → ${status}`)
+        setMsg(`âœ“ Bed ${bedId} â†’ ${status}`)
         setTimeout(() => setMsg(''), 3000)
     }
 
@@ -90,7 +99,7 @@ export default function NursePortal() {
         <div className="page">
             <div className="topbar">
                 <div className="topbar-logo">
-                    👩‍⚕️ <span>Nurse Portal</span>
+                    ðŸ‘©â€âš•ï¸ <span>Nurse Portal</span>
                     {nurse && <span style={{ fontSize: 12, fontWeight: 400, color: 'var(--text2)', marginLeft: 8 }}>{nurse.name}</span>}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -142,12 +151,12 @@ export default function NursePortal() {
                                 <input
                                     className="form-input"
                                     style={{ paddingLeft: 32 }}
-                                    placeholder="Search by bed, patient, ward…"
+                                    placeholder="Search by bed, patient, wardâ€¦"
                                     value={search}
                                     onChange={e => setSearch(e.target.value)}
                                 />
                             </div>
-                            <button className="btn btn-outline btn-sm" onClick={() => setScanMode(true)}>📷 Scan</button>
+                            <button className="btn btn-outline btn-sm" onClick={() => setScanMode(true)}>ðŸ“· Scan</button>
                             <button
                                 className="btn btn-ghost btn-sm"
                                 style={showFilters ? { background: 'var(--primary-light)' } : {}}
@@ -191,10 +200,11 @@ export default function NursePortal() {
                                             <div className="bed-num">{b.bedNumber}</div>
                                             <div className="bed-ward">W-{b.wardNumber}</div>
                                             <div className="bed-type" style={{ fontSize: 10 }}>{b.bedType}</div>
-                                            {b.patientName && <div style={{ fontSize: 9, fontWeight: 700, marginTop: 2 }}>👤 {b.patientName}</div>}
+                                            {b.patientName && <div style={{ fontSize: 9, fontWeight: 700, marginTop: 2 }}>&#x1F464; {b.patientName}</div>}
                                             <div style={{ marginTop: 4 }}>
                                                 <span className="badge" style={{ background: STATUS_COLORS[b.status] + '25', color: STATUS_COLORS[b.status], fontSize: 9 }}>{b.status}</span>
                                             </div>
+                                            {b.updatedAt && <div style={{ fontSize: 8, color: 'var(--text3)', marginTop: 2 }}>&#x23F1; {timeSince(b.updatedAt)}</div>}
                                         </div>
                                     ))}
                                 </div>
@@ -205,8 +215,9 @@ export default function NursePortal() {
                                             <div style={{ width: 40, textAlign: 'center', fontSize: 13, fontWeight: 700 }}>{b.bedNumber}</div>
                                             <div style={{ flex: 1 }}>
                                                 <div style={{ fontSize: 13, fontWeight: 600 }}>{b.bedId}</div>
-                                                <div style={{ fontSize: 11, color: 'var(--text2)' }}>Ward {b.wardNumber} · {b.bedType}</div>
-                                                {b.patientName && <div style={{ fontSize: 11, color: '#dc2626', fontWeight: 600 }}>👤 {b.patientName}</div>}
+                                                <div style={{ fontSize: 11, color: 'var(--text2)' }}>Ward {b.wardNumber} &middot; {b.bedType}</div>
+                                                {b.patientName && <div style={{ fontSize: 11, color: '#dc2626', fontWeight: 600 }}>&#x1F464; {b.patientName}</div>}
+                                                {b.updatedAt && <div style={{ fontSize: 10, color: 'var(--text3)' }}>&#x23F1; Updated {timeSince(b.updatedAt)}</div>}
                                             </div>
                                             <span className="badge" style={{ background: STATUS_COLORS[b.status] + '20', color: STATUS_COLORS[b.status], fontSize: 11 }}>{b.status}</span>
                                         </div>
@@ -228,11 +239,11 @@ export default function NursePortal() {
                             <div style={{ width: 72, height: 72, borderRadius: '50%', background: '#ede9fe', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28, margin: '0 auto 12px', color: '#7c3aed', fontWeight: 800 }}>
                                 {nurse?.name?.[0] || '?'}
                             </div>
-                            <div style={{ fontSize: 18, fontWeight: 700 }}>{nurse?.name || '—'}</div>
+                            <div style={{ fontSize: 18, fontWeight: 700 }}>{nurse?.name || 'â€”'}</div>
                             <div style={{ color: 'var(--text2)', fontSize: 13 }}>{nurse?.nurseId}</div>
-                            <div style={{ color: 'var(--text2)', fontSize: 13, marginTop: 4 }}>📞 {nurse?.mobile || '—'}</div>
-                            <div style={{ color: 'var(--text2)', fontSize: 13 }}>🏥 {nurse?.hospitalId}</div>
-                            {nurse?.shift && <div style={{ color: 'var(--text2)', fontSize: 13 }}>⏰ Shift: {nurse.shift}</div>}
+                            <div style={{ color: 'var(--text2)', fontSize: 13, marginTop: 4 }}>ðŸ“ž {nurse?.mobile || 'â€”'}</div>
+                            <div style={{ color: 'var(--text2)', fontSize: 13 }}>ðŸ¥ {nurse?.hospitalId}</div>
+                            {nurse?.shift && <div style={{ color: 'var(--text2)', fontSize: 13 }}>â° Shift: {nurse.shift}</div>}
                             <div style={{ marginTop: 10 }}>
                                 <span className="badge badge-purple">Nurse</span>
                             </div>
@@ -271,18 +282,18 @@ export default function NursePortal() {
                 <div className="modal-overlay" onClick={() => { setSelected(null); setPatientName('') }}>
                     <div className="modal" onClick={e => e.stopPropagation()}>
                         <div className="modal-header">
-                            <span className="modal-title">Bed {selected.bedNumber} — Ward {selected.wardNumber}</span>
+                            <span className="modal-title">Bed {selected.bedNumber} &ndash; Ward {selected.wardNumber}</span>
                             <button className="btn btn-ghost btn-icon" onClick={() => { setSelected(null); setPatientName('') }}><X size={18} /></button>
                         </div>
                         <p style={{ color: 'var(--text2)', marginBottom: 6, fontSize: 13 }}>
-                            Type: <strong>{selected.bedType}</strong> · Current: <strong style={{ color: STATUS_COLORS[selected.status] }}>{selected.status}</strong>
+                            Type: <strong>{selected.bedType}</strong> &middot; Current: <strong style={{ color: STATUS_COLORS[selected.status] }}>{selected.status}</strong>
                         </p>
                         {selected.patientName && (
                             <p style={{ color: '#dc2626', fontSize: 13, marginBottom: 10 }}>Patient: <strong>{selected.patientName}</strong></p>
                         )}
                         <div className="form-group">
                             <label className="form-label">Patient Name (if marking Occupied)</label>
-                            <input className="form-input" placeholder="Patient name…" value={patientName} onChange={e => setPatientName(e.target.value)} />
+                            <input className="form-input" placeholder="Patient name..." value={patientName} onChange={e => setPatientName(e.target.value)} />
                         </div>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                             {STATUSES.map(s => (
@@ -312,3 +323,4 @@ export default function NursePortal() {
         </div>
     )
 }
+

@@ -20,8 +20,17 @@ export default function DoctorPortal() {
     const [msg, setMsg] = useState('')
     const [error, setError] = useState('')
     const [profForm, setProfForm] = useState({})
-    const [manualForm, setManualForm] = useState({ date: new Date().toISOString().split('T')[0], availability: 'Present', shift: 'Morning' })
     const [geoLoading, setGeoLoading] = useState(false)
+
+    const getRelativeTime = (d) => {
+        if (!d) return ''
+        const diff = Math.floor((new Date() - new Date(d)) / 60000)
+        if (diff < 1) return 'Just now'
+        if (diff < 60) return `${diff} mins ago`
+        const hours = Math.floor(diff / 60)
+        if (hours < 24) return `${hours} hrs ago`
+        return `${Math.floor(hours / 24)} days ago`
+    }
 
     const doctorId = user?.doctorId || user?.ref
 
@@ -44,11 +53,6 @@ export default function DoctorPortal() {
         const fd = new FormData(); fd.append('photo', file)
         const r = await api.post(`/doctors/${doctorId}/photo`, fd)
         setDoctor(r.data.doctor); setMsg('Photo updated!')
-    }
-
-    const markManual = async () => {
-        await api.post('/doctors/attendance', { doctorId, hospitalId: doctor.hospitalId, ...manualForm, method: 'Manual' })
-        const r = await api.get(`/doctors/attendance/${doctorId}`); setAttendance(r.data); setMsg('Attendance marked!')
     }
 
     const geoCheckin = async (type) => {
@@ -132,9 +136,11 @@ export default function DoctorPortal() {
                             <div className="card-header"><ClipboardList size={16} /><span className="card-title">Recent Attendance</span></div>
                             {attendance.slice(0, 5).map(a => (
                                 <div key={a._id} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderTop: '1px solid var(--border)', fontSize: 13 }}>
-                                    <span>{new Date(a.date).toLocaleDateString()}</span>
-                                    <span style={{ color: 'var(--text2)' }}>{a.shift}</span>
-                                    <span className={`badge ${a.availability === 'Present' ? 'badge-green' : 'badge-red'}`}>{a.availability}</span>
+                                    <div>
+                                        <span>{new Date(a.date).toLocaleDateString()}</span>
+                                        <div style={{ fontSize: 11, color: 'var(--text3)' }}>Updated: {a.checkOut ? getRelativeTime(a.checkOut) : getRelativeTime(a.checkIn || a.createdAt)}</div>
+                                    </div>
+                                    <span className={`badge ${a.availability === 'Present' ? 'badge-green' : 'badge-red'}`} style={{ alignSelf: 'flex-start' }}>{a.availability}</span>
                                 </div>
                             ))}
                             {attendance.length === 0 && <div className="empty"><p>No attendance records</p></div>}
@@ -170,6 +176,14 @@ export default function DoctorPortal() {
                     <div>
                         {error && <div className="alert alert-error"><AlertCircle size={14} />{error}</div>}
 
+                        <div className="alert alert-warning" style={{ marginBottom: 14, display: 'flex', gap: 8 }}>
+                            <MapPin size={16} style={{ flexShrink: 0, marginTop: 2 }} />
+                            <div>
+                                <strong style={{ display: 'block', marginBottom: 2 }}>Turn ON Location</strong>
+                                <p style={{ margin: 0, fontSize: 13, color: 'inherit', opacity: 0.9 }}>Please ensure your device GPS is turned on and location access is allowed for geofencing.</p>
+                            </div>
+                        </div>
+
                         {/* GPS Buttons */}
                         <div className="card" style={{ marginBottom: 14 }}>
                             <div className="card-header"><MapPin size={18} color="var(--primary)" /><span className="card-title">GPS Geofence</span></div>
@@ -185,43 +199,18 @@ export default function DoctorPortal() {
                             </div>
                         </div>
 
-                        {/* Manual */}
-                        <div className="card" style={{ marginBottom: 14 }}>
-                            <div className="card-header"><ClipboardList size={16} /><span className="card-title">Manual Entry</span></div>
-                            <div className="form-group">
-                                <label className="form-label">Date</label>
-                                <input className="form-input" type="date" value={manualForm.date} onChange={e => setManualForm(f => ({ ...f, date: e.target.value }))} />
-                            </div>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                                <div className="form-group">
-                                    <label className="form-label">Status</label>
-                                    <select className="form-select" value={manualForm.availability} onChange={e => setManualForm(f => ({ ...f, availability: e.target.value }))}>
-                                        <option>Present</option><option>Absent</option><option>Leave</option>
-                                    </select>
-                                </div>
-                                <div className="form-group">
-                                    <label className="form-label">Shift</label>
-                                    <select className="form-select" value={manualForm.shift} onChange={e => setManualForm(f => ({ ...f, shift: e.target.value }))}>
-                                        <option>Morning</option><option>Evening</option><option>Night</option>
-                                    </select>
-                                </div>
-                            </div>
-                            <button className="btn btn-primary btn-full" onClick={markManual}>Mark Attendance</button>
-                        </div>
-
                         {/* History */}
                         <div className="card">
                             <div className="card-header"><span className="card-title">Attendance History</span></div>
                             <div className="table-wrap">
                                 <table>
-                                    <thead><tr><th>Date</th><th>Status</th><th>Shift</th><th>Hours</th></tr></thead>
+                                    <thead><tr><th>Date</th><th>Status</th><th>Updated</th></tr></thead>
                                     <tbody>
                                         {attendance.map(a => (
                                             <tr key={a._id}>
                                                 <td>{new Date(a.date).toLocaleDateString()}</td>
                                                 <td><span className={`badge ${a.availability === 'Present' ? 'badge-green' : 'badge-red'}`}>{a.availability}</span></td>
-                                                <td>{a.shift}</td>
-                                                <td>{a.totalHours || '-'}</td>
+                                                <td style={{ color: 'var(--text2)', fontSize: 13 }}>Updated: {a.checkOut ? getRelativeTime(a.checkOut) : getRelativeTime(a.checkIn || a.createdAt)}</td>
                                             </tr>
                                         ))}
                                     </tbody>

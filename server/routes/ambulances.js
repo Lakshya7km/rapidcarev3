@@ -29,6 +29,9 @@ router.post('/', auth(['hospital', 'superadmin']), async (req, res) => {
 router.put('/:ambulanceId', auth(['ambulance', 'hospital', 'superadmin']), async (req, res) => {
     try {
         const a = await Ambulance.findOneAndUpdate({ ambulanceId: req.params.ambulanceId }, req.body, { new: true }).select('-password');
+        if (global.io) {
+            global.io.emit('ambulance:update', a);
+        }
         res.json(a);
     } catch (e) { res.status(500).json({ message: e.message }); }
 });

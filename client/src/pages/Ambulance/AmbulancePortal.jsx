@@ -68,6 +68,10 @@ export default function AmbulancePortal() {
         socket.on('emergency:update', (er) => {
             setEmergencies(prev => prev.map(e => e._id === er._id ? er : e))
         })
+        // Real-time task/ambulance updates
+        socket.on('ambulance:update', (data) => {
+            if (data.ambulanceId === ambulanceId) setAmbulance(data)
+        })
 
         // Offline on close
         const offline = () => { api.put(`/ambulances/${ambulanceId}`, { status: 'Offline' }).catch(() => { }) }
@@ -127,6 +131,18 @@ export default function AmbulancePortal() {
 
             <div style={{ padding: '16px', paddingBottom: 80, maxWidth: 900, margin: '0 auto' }}>
                 {msg && <div className="alert alert-success" onClick={() => setMsg('')}>{msg}</div>}
+                {ambulance?.assignedTask && (
+                    <div className="task-banner" style={{ background: '#eff6ff', border: '1px solid #bfdbfe', padding: '12px 16px', borderRadius: 12, marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div>
+                            <div style={{ fontSize: 11, fontWeight: 700, color: '#2563eb', textTransform: 'uppercase', marginBottom: 4 }}>📋 New Task Assigned</div>
+                            <div style={{ fontSize: 14, fontWeight: 600, color: '#1e3a8a' }}>{ambulance.assignedTask}</div>
+                        </div>
+                        <button className="btn btn-primary btn-sm" onClick={async () => {
+                            const r = await api.put(`/ambulances/${ambulanceId}`, { assignedTask: '' })
+                            setAmbulance(r.data); setMsg('Task marked as completed!')
+                        }}>Mark Done</button>
+                    </div>
+                )}
 
                 {/* Dashboard */}
                 {tab === 'dashboard' && (
@@ -304,6 +320,12 @@ export default function AmbulancePortal() {
                 @media(min-width:768px){
                     #amb-tab-nav{display:flex!important;gap:4px;}
                     .page > div:nth-child(2){padding-bottom:20px;}
+                }
+                .task-banner { animation: pulseBg 2s infinite; }
+                @keyframes pulseBg {
+                    0% { box-shadow: 0 0 0 0 rgba(59,130,246,0.4); }
+                    70% { box-shadow: 0 0 0 8px rgba(59,130,246,0); }
+                    100% { box-shadow: 0 0 0 0 rgba(59,130,246,0); }
                 }
             `}</style>
         </div>

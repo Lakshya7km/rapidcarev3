@@ -22,7 +22,15 @@ router.get('/', async (req, res) => {
     try {
         const { hospitalId } = req.query;
         const q = hospitalId ? { hospitalId } : {};
-        const doctors = await Doctor.find(q, '-password');
+        const doctors = await Doctor.find(q, '-password').lean();
+
+        const today = new Date(); today.setHours(0, 0, 0, 0);
+        for (let d of doctors) {
+            const a = await Attendance.findOne({ doctorId: d.doctorId, date: today });
+            if (a) {
+                d.lastUpdated = a.checkOut || a.checkIn || a.createdAt;
+            }
+        }
         res.json(doctors);
     } catch (e) { res.status(500).json({ message: e.message }); }
 });
@@ -114,6 +122,34 @@ router.post('/geofence-checkout', auth(['doctor']), async (req, res) => {
         a.checkOut = new Date(); a.totalHours = hours;
         await a.save();
         res.json({ success: true, attendance: a });
+    } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+// Attendance override (Reception/Admin)
+router.post('/attendance-override', auth(['hospital', 'superadmin']), async (req, res) => {
+    try {
+        const { doctorId, availability, hospitalId } = req.body;
+        const today = new Date(); today.setHours(0, 0, 0, 0);
+        let a = await Attendance.findOne({ doctorId, date: today });
+        if (a) {
+            a.availability = availability;
+            a.markedBy = 'Reception';
+            if (availability === 'Present' && !a.checkIn) a.checkIn = new Date();
+        } else {
+            a = new Attendance({
+                doctorId,
+                hospitalId,
+                date: today,
+                availability,
+                markedBy: 'Reception',
+                checkIn: availability === 'Present' ? new Date() : undefined
+            });
+        }
+        await a.save();
+        // Also update doctor's immediate status
+        const doctorStatus = availability === 'Present' ? 'Available' : 'Unavailable';
+        await Doctor.findOneAndUpdate({ doctorId }, { availability: doctorStatus });
+        res.json(a);
     } catch (e) { res.status(500).json({ message: e.message }); }
 });
 

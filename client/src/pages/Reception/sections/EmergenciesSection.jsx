@@ -19,10 +19,12 @@ export default function EmergenciesSection({ hospitalId }) {
     const [hospitals, setHospitals] = useState([])
     const [loading, setLoading] = useState(true)
     const [selected, setSelected] = useState(null)
-    const [action, setAction] = useState(null) // 'admit' | 'refer'
+    const [action, setAction] = useState(null) // 'admit' | 'refer' | 'accept' | 'reject'
     const [selectedBed, setSelectedBed] = useState('')
     const [referTo, setReferTo] = useState('')
     const [referNote, setReferNote] = useState('')
+    const [actionForm, setActionForm] = useState({ assignedDoctor: '', replyMessage: '', denialReason: '' })
+    const [docs, setDocs] = useState([])
     const [filterStatus, setFilterStatus] = useState('')
     const [msg, setMsg] = useState('')
 
@@ -34,6 +36,7 @@ export default function EmergenciesSection({ hospitalId }) {
         load()
         api.get(`/beds?hospitalId=${hospitalId}&status=Vacant`).then(r => setBeds(r.data))
         api.get('/hospitals').then(r => setHospitals(r.data.filter(h => h.hospitalId !== hospitalId)))
+        api.get(`/doctors?hospitalId=${hospitalId}`).then(r => setDocs(r.data))
     }, [hospitalId])
 
     useEffect(() => {
@@ -44,8 +47,8 @@ export default function EmergenciesSection({ hospitalId }) {
 
     const admit = async () => {
         if (!selectedBed) return
-        await api.put(`/emergency/${selected._id}/admit`, { bedId: selectedBed, patientName: selected.patientName })
-        setAction(null); setSelected(null); setSelectedBed('')
+        await api.put(`/emergency/${selected._id}/admit`, { bedId: selectedBed, patientName: selected.patientName, assignedDoctor: actionForm.assignedDoctor, replyMessage: actionForm.replyMessage })
+        setAction(null); setSelected(null); setSelectedBed(''); setActionForm({ assignedDoctor: '', replyMessage: '', denialReason: '' })
         setMsg('Patient admitted and bed assigned!')
         load()
         // Refresh vacant beds
@@ -54,9 +57,23 @@ export default function EmergenciesSection({ hospitalId }) {
 
     const refer = async () => {
         if (!referTo) return
-        await api.put(`/emergency/${selected._id}/status`, { status: 'Referred', transferredTo: referTo, note: referNote })
+        await api.put(`/emergency/${selected._id}/status`, { status: 'Transferred', transferredTo: referTo, denialReason: referNote })
         setAction(null); setSelected(null); setReferTo(''); setReferNote('')
         setMsg(`Patient referred to ${referTo}`)
+        load()
+    }
+
+    const processAction = async (status) => {
+        const payload = { status }
+        if (status === 'Accepted') {
+            payload.assignedDoctor = actionForm.assignedDoctor
+            payload.replyMessage = actionForm.replyMessage
+        }
+        if (status === 'Rejected') {
+            payload.denialReason = actionForm.denialReason
+        }
+        await api.put(`/emergency/${selected._id}/status`, payload)
+        setAction(null); setSelected(null); setActionForm({ assignedDoctor: '', replyMessage: '', denialReason: '' })
         load()
     }
 
@@ -112,24 +129,49 @@ export default function EmergenciesSection({ hospitalId }) {
                                 <div style={{ fontSize: 12, color: 'var(--text2)', marginTop: 2 }}>
                                     🚑 {req.ambulanceId || 'No ambulance'} · 📞 {req.contact || '—'}
                                 </div>
+                                {req.referredFrom && (
+                                    <div style={{ fontSize: 12, background: '#fdf4ff', color: '#c026d3', marginTop: 4, padding: '2px 8px', borderRadius: 12, display: 'inline-flex', fontWeight: 700, alignItems: 'center', gap: 4 }}>
+                                        🔀 Referred from: {req.referredFrom}
+                                    </div>
+                                )}
                                 {req.condition && (
-                                    <div style={{ fontSize: 12, color: '#dc2626', marginTop: 2, fontWeight: 600 }}>
+                                    <div style={{ fontSize: 13, color: '#dc2626', marginTop: 4, fontWeight: 600 }}>
                                         Condition: {req.condition}
                                     </div>
                                 )}
+                                {req.symptoms && (
+                                    <div style={{ fontSize: 12, color: 'var(--text2)', marginTop: 2 }}>
+                                        🩺 Symptoms: {req.symptoms}
+                                    </div>
+                                )}
+                                {req.equipment && (
+                                    <div style={{ fontSize: 12, color: 'var(--text2)', marginTop: 2 }}>
+                                        ⚕️ Equipment Needed: {req.equipment}
+                                    </div>
+                                )}
                                 {req.ambulanceNotes && (
-                                    <div style={{ fontSize: 12, color: '#1d4ed8', marginTop: 2 }}>
-                                        📋 Ambulance notes: {req.ambulanceNotes}
+                                    <div style={{ fontSize: 12, color: '#1d4ed8', marginTop: 4, background: '#eff6ff', padding: '4px 8px', borderRadius: 4 }}>
+                                        📋 Ambulance Notes: <strong>{req.ambulanceNotes}</strong>
+                                    </div>
+                                )}
+                                {req.assignedDoctor && (
+                                    <div style={{ fontSize: 12, color: '#15803d', marginTop: 2 }}>
+                                        👨‍⚕️ Assigned Dr: <strong>{req.assignedDoctor}</strong>
                                     </div>
                                 )}
                                 {req.transferredTo && (
-                                    <div style={{ fontSize: 12, color: '#6d28d9', marginTop: 2 }}>
+                                    <div style={{ fontSize: 12, color: '#6d28d9', marginTop: 4 }}>
                                         ➡ Referred to: <strong>{req.transferredTo}</strong>
                                     </div>
                                 )}
                                 {req.bedId && (
-                                    <div style={{ fontSize: 12, color: '#065f46', marginTop: 2 }}>
+                                    <div style={{ fontSize: 12, color: '#065f46', marginTop: 4 }}>
                                         🛏 Admitted to bed: <strong>{req.bedId}</strong>
+                                    </div>
+                                )}
+                                {req.denialReason && (
+                                    <div style={{ fontSize: 12, color: '#991b1b', marginTop: 4 }}>
+                                        Reason: {req.denialReason}
                                     </div>
                                 )}
                             </div>
@@ -138,7 +180,7 @@ export default function EmergenciesSection({ hospitalId }) {
                                     {req.status}
                                 </span>
                                 <span style={{ fontSize: 10, color: 'var(--text3)' }}>
-                                    {new Date(req.createdAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                                    Updated: {new Date(req.updatedAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
                                 </span>
                             </div>
                         </div>
@@ -147,7 +189,7 @@ export default function EmergenciesSection({ hospitalId }) {
                         {isPending && (
                             <div style={{ display: 'flex', gap: 8, marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--border)', flexWrap: 'wrap' }}>
                                 {req.status === 'Pending' && (
-                                    <button className="btn btn-sm btn-success" onClick={() => updateStatus(req._id, 'Accepted')}>
+                                    <button className="btn btn-sm btn-success" onClick={() => { setSelected(req); setAction('accept') }}>
                                         ✓ Accept
                                     </button>
                                 )}
@@ -170,7 +212,7 @@ export default function EmergenciesSection({ hospitalId }) {
                                     </button>
                                 )}
                                 {req.status === 'Pending' && (
-                                    <button className="btn btn-sm btn-ghost" onClick={() => updateStatus(req._id, 'Rejected')} style={{ color: '#ef4444' }}>
+                                    <button className="btn btn-sm btn-ghost" onClick={() => { setSelected(req); setAction('reject') }} style={{ color: '#ef4444' }}>
                                         ✕ Reject
                                     </button>
                                 )}
@@ -231,6 +273,51 @@ export default function EmergenciesSection({ hospitalId }) {
                         </div>
                         <button className="btn btn-full" style={{ background: '#6d28d9', color: 'white' }} onClick={refer} disabled={!referTo}>
                             <ArrowRight size={15} /> Confirm Referral
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {/* Accept Modal */}
+            {action === 'accept' && selected && (
+                <div className="modal-overlay" onClick={() => { setAction(null); setSelected(null); setActionForm({ assignedDoctor: '', replyMessage: '', denialReason: '' }) }}>
+                    <div className="modal" onClick={e => e.stopPropagation()}>
+                        <div className="modal-header">
+                            <span className="modal-title">Accept Request — {selected.patientName}</span>
+                            <button className="btn btn-ghost btn-icon" onClick={() => { setAction(null); setSelected(null); setActionForm({ assignedDoctor: '', replyMessage: '', denialReason: '' }) }}><X size={18} /></button>
+                        </div>
+                        <div className="form-group">
+                            <label className="form-label">Assign Doctor (Optional)</label>
+                            <select className="form-select" value={actionForm.assignedDoctor} onChange={e => setActionForm(f => ({ ...f, assignedDoctor: e.target.value }))}>
+                                <option value="">— Select Doctor —</option>
+                                {docs.map(d => <option key={d.doctorId} value={d.name}>{d.name} ({d.speciality || 'General'})</option>)}
+                            </select>
+                        </div>
+                        <div className="form-group">
+                            <label className="form-label">Reply Message to Ambulance (Optional)</label>
+                            <textarea className="form-textarea" placeholder="e.g. Bring patient to ER section B" value={actionForm.replyMessage} onChange={e => setActionForm(f => ({ ...f, replyMessage: e.target.value }))} />
+                        </div>
+                        <button className="btn btn-success btn-full" onClick={() => processAction('Accepted')}>
+                            ✓ Confirm Acceptance
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {/* Reject Modal */}
+            {action === 'reject' && selected && (
+                <div className="modal-overlay" onClick={() => { setAction(null); setSelected(null); setActionForm({ assignedDoctor: '', replyMessage: '', denialReason: '' }) }}>
+                    <div className="modal" onClick={e => e.stopPropagation()}>
+                        <div className="modal-header">
+                            <span className="modal-title">Reject Request</span>
+                            <button className="btn btn-ghost btn-icon" onClick={() => { setAction(null); setSelected(null); setActionForm({ assignedDoctor: '', replyMessage: '', denialReason: '' }) }}><X size={18} /></button>
+                        </div>
+                        <div className="form-group">
+                            <label className="form-label">Reason for Denial (Sent to Dispatcher)</label>
+                            <textarea className="form-textarea" placeholder="e.g. No ventilator beds available" value={actionForm.denialReason} onChange={e => setActionForm(f => ({ ...f, denialReason: e.target.value }))} autoFocus />
+                        </div>
+                        <button className="btn btn-danger btn-full" disabled={!actionForm.denialReason} onClick={() => processAction('Rejected')}>
+                            ✕ Reject Case
                         </button>
                     </div>
                 </div>

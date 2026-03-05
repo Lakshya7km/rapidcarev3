@@ -26,10 +26,37 @@ router.post('/', async (req, res) => {
 
 router.put('/:id/status', auth(['hospital']), async (req, res) => {
     try {
-        const { status, transferredTo } = req.body;
+        const { status, transferredTo, denialReason, replyMessage, assignedDoctor } = req.body;
         const update = { status, updatedAt: new Date() };
         if (transferredTo) update.transferredTo = transferredTo;
+        if (denialReason) update.denialReason = denialReason;
+        if (replyMessage) update.replyMessage = replyMessage;
+        if (assignedDoctor) update.assignedDoctor = assignedDoctor;
+
         const er = await EmergencyRequest.findByIdAndUpdate(req.params.id, update, { new: true });
+
+        if (status === 'Transferred' && transferredTo) {
+            // Clone the request for the receiving hospital
+            const cloneData = er.toObject();
+            delete cloneData._id;
+            delete cloneData.createdAt;
+            delete cloneData.updatedAt;
+
+            cloneData.hospitalId = transferredTo;
+            cloneData.referredFrom = er.hospitalId; // Target hospital knows who sent it
+            cloneData.status = 'Pending';
+            cloneData.transferredTo = undefined;
+            cloneData.denialReason = undefined;
+            cloneData.replyMessage = undefined;
+            cloneData.assignedDoctor = undefined;
+            cloneData.bedId = undefined;
+
+            const newReq = await EmergencyRequest.create(cloneData);
+            if (global.io) {
+                global.io.to(transferredTo).emit('emergency:new', newReq);
+            }
+        }
+
         if (global.io) {
             global.io.to(er.hospitalId).emit('emergency:update', er);
             if (er.ambulanceId) global.io.to(er.ambulanceId).emit('emergency:update', er);
@@ -40,9 +67,13 @@ router.put('/:id/status', auth(['hospital']), async (req, res) => {
 
 router.put('/:id/admit', auth(['hospital']), async (req, res) => {
     try {
-        const { bedId, patientName } = req.body;
-        const er = await EmergencyRequest.findByIdAndUpdate(req.params.id, { status: 'Admitted', bedId, updatedAt: new Date() }, { new: true });
-        if (bedId) await Bed.findOneAndUpdate({ bedId }, { status: 'Occupied', patientName: patientName || er.patientName, admittedAt: new Date() });
+        const { bedId, patientName, assignedDoctor, replyMessage } = req.body;
+        const update = { status: 'Admitted', bedId, updatedAt: new Date() };
+        if (assignedDoctor) update.assignedDoctor = assignedDoctor;
+        if (replyMessage) update.replyMessage = replyMessage;
+
+        const er = await EmergencyRequest.findByIdAndUpdate(req.params.id, update, { new: true });
+        if (bedId) await Bed.findOneAndUpdate({ bedId }, { status: 'Occupied', patientName: patientName || er.patientName, admittedAt: new Date(), updatedAt: new Date() });
         if (global.io) global.io.to(er.hospitalId).emit('bed:update', { bedId });
         res.json(er);
     } catch (e) { res.status(500).json({ message: e.message }); }

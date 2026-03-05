@@ -1,8 +1,8 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import api from '../../lib/api'
-import { Stethoscope, Truck, ShieldCheck, AlertCircle, X, ChevronRight, Phone, Building2, UserRound, Search, MapPin } from 'lucide-react'
+import { Stethoscope, Truck, ShieldCheck, AlertCircle, X, ChevronRight, Phone, Building2, UserRound, Search, MapPin, Droplets } from 'lucide-react'
 import './Home.css'
 
 const FEATURES = [
@@ -19,6 +19,13 @@ const ROLES = [
     { key: 'superadmin', label: 'Authority', sub: 'System Master', icon: '🛡️', color: '#212529', userLabel: 'Admin User', userPlace: 'Administrator', passLabel: 'Authority Key', passPlace: '••••••••', route: '/admin' },
 ]
 
+const BLOOD_COLORS = {
+    'A+': '#ef4444', 'A-': '#f97316', 'B+': '#8b5cf6', 'B-': '#a855f7',
+    'O+': '#0ea5e9', 'O-': '#06b6d4', 'AB+': '#22c55e', 'AB-': '#16a34a'
+}
+const BLOOD_TYPES = ['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-']
+
+
 export default function Home() {
     const { login } = useAuth()
     const navigate = useNavigate()
@@ -26,6 +33,39 @@ export default function Home() {
     const [form, setForm] = useState({ username: '', password: '' })
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState('')
+
+    const [hospitals, setHospitals] = useState([])
+    const [bloodStock, setBloodStock] = useState({})
+    const [showDonateForm, setShowDonateForm] = useState(false)
+    const [donateForm, setDonateForm] = useState({ name: '', bloodType: 'A+', contact: '', city: '', hospitalId: '' })
+    const [donateMsg, setDonateMsg] = useState('')
+
+    const load = async () => {
+        try {
+            const { data } = await api.get('/hospitals')
+            setHospitals(data)
+            data.forEach(h => {
+                if (!bloodStock[h.hospitalId]) {
+                    api.get(`/bloodbank?hospitalId=${h.hospitalId}`).then(r => setBloodStock(prev => ({ ...prev, [h.hospitalId]: r.data }))).catch(() => { })
+                }
+            })
+        } catch (err) { }
+    }
+
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    useEffect(() => { load() }, [])
+
+    const submitDonation = async (e) => {
+        e.preventDefault()
+        try {
+            await api.post('/bloodbank/donors', donateForm)
+            setDonateMsg('Donation request submitted successfully! The hospital will contact you shortly.')
+            setTimeout(() => { setShowDonateForm(false); setDonateMsg('') }, 3000)
+            setDonateForm({ name: '', bloodType: 'A+', contact: '', city: '', hospitalId: '' })
+        } catch (err) {
+            setDonateMsg('Failed to submit request. Please try again.')
+        }
+    }
 
     const openRole = (role) => {
         setActive(role)
@@ -104,6 +144,56 @@ export default function Home() {
                 </div>
             </div>
 
+            {/* Global Blood Stock Section */}
+            <div className="container" id="section-blood" style={{ marginTop: '4rem' }}>
+                <div style={{ background: 'white', padding: '2rem', borderRadius: 20, boxShadow: '0 4px 15px rgba(0,0,0,0.03)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem', flexWrap: 'wrap', gap: 16 }}>
+                        <div>
+                            <h2 style={{ margin: 0, fontWeight: 700, color: '#dc2626', display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <span style={{ fontSize: '1.5rem' }}>🩸</span> Global Blood Availability
+                            </h2>
+                            <p className="text-muted" style={{ fontSize: '0.9rem', margin: '4px 0 0 0' }}>Real-time blood stock across all registered facilities</p>
+                        </div>
+                        <button className="btn font-bold rounded-pill" style={{ background: '#dc2626', color: 'white', padding: '8px 24px', whiteSpace: 'nowrap' }} onClick={() => setShowDonateForm(true)}>
+                            ❤ Donate Blood
+                        </button>
+                    </div>
+
+                    <p style={{ color: '#64748b', fontSize: '0.95rem', margin: '0 0 1.5rem', lineHeight: 1.5 }}>
+                        Can't find blood here? Check the official Government portal for **All India** real-time blood availability across all registered blood banks.
+                    </p>
+                    <a href="https://eraktkosh.mohfw.gov.in/eraktkoshPortal/#/publicPages/bloodAvailabilitySearch" target="_blank" rel="noreferrer" className="btn btn-primary" style={{ background: '#dc2626', border: 'none', padding: '12px 24px', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 8, borderRadius: 8 }}>
+                        <Droplets size={18} /> Visit eRaktKosh Portal
+                    </a>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1rem' }}>
+                        {hospitals.map(h => {
+                            const stock = bloodStock[h.hospitalId] || []
+                            if (stock.length === 0) return null // Hide hospitals with empty blood bank
+
+                            return (
+                                <div key={`blood-${h.hospitalId}`} style={{ border: '1px solid #fecaca', borderRadius: 12, padding: '1rem', background: '#fff1f2' }}>
+                                    <div style={{ fontWeight: 700, marginBottom: 8, color: '#991b1b', fontSize: '0.95rem' }}>{h.name}</div>
+                                    <div style={{ fontSize: '0.8rem', color: '#7f1d1d', marginBottom: 12 }}>📍 {h.address?.city}</div>
+
+                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                                        {stock.filter(b => b.units > 0).map(b => (
+                                            <div key={b._id} style={{ background: '#dc2626', color: 'white', padding: '4px 8px', borderRadius: 6, fontSize: '0.8rem', fontWeight: 700 }}>
+                                                {b.bloodType}: {b.units} <span style={{ fontSize: '0.7rem', fontWeight: 500 }}>u</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    {stock.filter(b => b.units > 0).length === 0 && (
+                                        <div style={{ fontSize: '0.85rem', color: '#dc2626', fontStyle: 'italic' }}>Out of stock</div>
+                                    )}
+                                </div>
+                            )
+                        })}
+                    </div>
+                </div>
+            </div>
+
+
             {/* Portals Access Section */}
             <div className="container" id="login-section" style={{ marginTop: '5rem', paddingTop: '3rem' }}>
                 <div className="text-center" style={{ marginBottom: '3rem' }}>
@@ -157,6 +247,60 @@ export default function Home() {
             <footer className="text-center" style={{ marginTop: '4rem', padding: '2rem', background: '#fff', borderTop: '1px solid #e3e6f0' }}>
                 <p className="text-muted mb-0" style={{ fontSize: '0.9rem' }}>© 2026 RapidCare. All rights reserved.</p>
             </footer>
+
+            {/* Donate Blood Modal */}
+            {showDonateForm && (
+                <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 3000, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setShowDonateForm(false)}>
+                    <div style={{ background: 'white', padding: '2rem', borderRadius: 16, width: '90%', maxWidth: 450, position: 'relative' }} onClick={e => e.stopPropagation()}>
+                        <button style={{ position: 'absolute', top: 16, right: 16, border: 'none', background: 'transparent', fontSize: '1.2rem', cursor: 'pointer' }} onClick={() => setShowDonateForm(false)}>✕</button>
+
+                        <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
+                            <div style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}>🩸</div>
+                            <h3 style={{ margin: 0, fontWeight: 700, color: '#dc2626' }}>Blood Donation Request</h3>
+                            <p style={{ margin: 0, fontSize: '0.9rem', color: '#6c757d', marginTop: 4 }}>Your single donation can save up to 3 lives.</p>
+                        </div>
+
+                        {donateMsg && <div style={{ background: donateMsg.includes('success') ? '#dcfce7' : '#fee2e2', color: donateMsg.includes('success') ? '#166534' : '#991b1b', padding: '12px', borderRadius: 8, marginBottom: '1rem', fontSize: '0.9rem', textAlign: 'center', fontWeight: 500 }}>{donateMsg}</div>}
+
+                        <form onSubmit={submitDonation}>
+                            <div className="form-group" style={{ marginBottom: 12 }}>
+                                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: 4 }}>Select Hospital Center *</label>
+                                <select required style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #ced4da', fontSize: '0.95rem' }} value={donateForm.hospitalId} onChange={e => setDonateForm({ ...donateForm, hospitalId: e.target.value })}>
+                                    <option value="" disabled>Select nearest hospital</option>
+                                    {hospitals.map(h => <option key={h.hospitalId} value={h.hospitalId}>{h.name} ({h.address?.city})</option>)}
+                                </select>
+                            </div>
+
+                            <div className="form-group" style={{ marginBottom: 12 }}>
+                                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: 4 }}>Full Name *</label>
+                                <input required type="text" style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #ced4da', fontSize: '0.95rem' }} value={donateForm.name} onChange={e => setDonateForm({ ...donateForm, name: e.target.value })} />
+                            </div>
+
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+                                <div className="form-group">
+                                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: 4 }}>Blood Group *</label>
+                                    <select style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #ced4da', fontSize: '0.95rem' }} value={donateForm.bloodType} onChange={e => setDonateForm({ ...donateForm, bloodType: e.target.value })}>
+                                        {['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'].map(type => <option key={type} value={type}>{type}</option>)}
+                                    </select>
+                                </div>
+                                <div className="form-group">
+                                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: 4 }}>Contact Number *</label>
+                                    <input required type="tel" pattern="[6-9][0-9]{9}" title="Enter a valid 10-digit Indian mobile number" style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #ced4da', fontSize: '0.95rem' }} value={donateForm.contact} onChange={e => setDonateForm({ ...donateForm, contact: e.target.value })} placeholder="e.g. 9876543210" />
+                                </div>
+                            </div>
+
+                            <div className="form-group" style={{ marginBottom: 20 }}>
+                                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: 4 }}>City *</label>
+                                <input required type="text" style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #ced4da', fontSize: '0.95rem' }} value={donateForm.city} onChange={e => setDonateForm({ ...donateForm, city: e.target.value })} />
+                            </div>
+
+                            <button type="submit" className="btn btn-primary" style={{ width: '100%', background: '#dc2626', border: 'none', padding: '12px', fontSize: '1rem', fontWeight: 700, borderRadius: 8 }}>
+                                Submit Details
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }
