@@ -34,16 +34,22 @@ router.post('/login', async (req, res) => {
         if (user.hospitalId) payload.hospitalId = user.hospitalId;
 
         const token = sign(payload);
+        const userObj = {
+            id: user._id,
+            role,
+            username: username,
+            hospitalId: payload.hospitalId,
+            ...(role === 'doctor' ? { name: user.name, speciality: user.speciality } : {}),
+            ...(role === 'nurse' ? { name: user.name } : {}),
+            ...(role === 'ambulance' ? { vehicleNumber: user.vehicleNumber } : {})
+        };
 
         if (role === 'ambulance') {
             user.lastLogin = new Date(); user.status = 'On Duty';
             await user.save();
-            return res.json({ token, ambulance: user });
         }
-        if (role === 'doctor') return res.json({ token, doctor: user, hospitalId: user.hospitalId });
-        if (role === 'nurse') return res.json({ token, nurse: user });
-        if (role === 'superadmin') return res.json({ token, admin: { username: user.username } });
-        res.json({ token, forcePasswordChange: !!user.forcePasswordChange });
+
+        res.json({ token, user: userObj, forcePasswordChange: !!user.forcePasswordChange });
     } catch (e) {
         res.status(500).json({ message: e.message });
     }

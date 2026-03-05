@@ -89,12 +89,14 @@ export default function AmbulancePortal() {
     }
 
     const submitRequest = async () => {
-        const r = await api.post('/emergency', { ...reqForm, ambulanceId, source: 'Ambulance' })
-        socket.emit('join:hospital', reqForm.hospitalId)
-        setEmergencies(prev => [r.data, ...prev])
-        setMsg('Emergency request sent to ' + reqForm.hospitalId + '!')
-        setTab('status')
-        setReqForm({ patientName: '', age: '', gender: 'Male', emergencyType: 'General', condition: 'Stable', equipment: '', symptoms: '', reason: '', ambulanceNotes: '', hospitalId: ambulance?.hospitalId || ownHospitalId })
+        try {
+            const r = await api.post('/emergency', { ...reqForm, ambulanceId, source: 'Ambulance' })
+            socket.emit('join:hospital', reqForm.hospitalId)
+            setEmergencies(prev => [r.data, ...prev])
+            setMsg('Emergency request sent to ' + reqForm.hospitalId + '!')
+            setTab('status')
+            setReqForm({ patientName: '', age: '', gender: 'Male', emergencyType: 'General', condition: 'Stable', equipment: '', symptoms: '', reason: '', ambulanceNotes: '', hospitalId: ambulance?.hospitalId || ownHospitalId })
+        } catch (err) { alert(err.response?.data?.message || 'Failed to submit request') }
     }
 
     if (loading) return <div className="loader-center"><div className="spinner" /></div>

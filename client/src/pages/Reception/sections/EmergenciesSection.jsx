@@ -9,7 +9,8 @@ const STATUS_COLORS = {
     'En Route': { bg: '#eff6ff', color: '#1d4ed8', border: '#bfdbfe' },
     Arrived: { bg: '#f5f3ff', color: '#6d28d9', border: '#ddd6fe' },
     Admitted: { bg: '#f0fdf4', color: '#065f46', border: '#a7f3d0' },
-    Referred: { bg: '#fef2f2', color: '#991b1b', border: '#fecaca' },
+    Transferred: { bg: '#fef2f2', color: '#991b1b', border: '#fecaca' },
+    Rejected: { bg: '#fef2f2', color: '#991b1b', border: '#fecaca' },
     Completed: { bg: '#f8fafc', color: '#64748b', border: '#e2e8f0' },
 }
 
@@ -47,39 +48,47 @@ export default function EmergenciesSection({ hospitalId }) {
 
     const admit = async () => {
         if (!selectedBed) return
-        await api.put(`/emergency/${selected._id}/admit`, { bedId: selectedBed, patientName: selected.patientName, assignedDoctor: actionForm.assignedDoctor, replyMessage: actionForm.replyMessage })
-        setAction(null); setSelected(null); setSelectedBed(''); setActionForm({ assignedDoctor: '', replyMessage: '', denialReason: '' })
-        setMsg('Patient admitted and bed assigned!')
-        load()
-        // Refresh vacant beds
-        api.get(`/beds?hospitalId=${hospitalId}&status=Vacant`).then(r => setBeds(r.data))
+        try {
+            await api.put(`/emergency/${selected._id}/admit`, { bedId: selectedBed, patientName: selected.patientName, assignedDoctor: actionForm.assignedDoctor, replyMessage: actionForm.replyMessage })
+            setAction(null); setSelected(null); setSelectedBed(''); setActionForm({ assignedDoctor: '', replyMessage: '', denialReason: '' })
+            setMsg('Patient admitted and bed assigned!')
+            load()
+            // Refresh vacant beds
+            api.get(`/beds?hospitalId=${hospitalId}&status=Vacant`).then(r => setBeds(r.data))
+        } catch (err) { alert(err.response?.data?.message || 'Failed to admit patient') }
     }
 
     const refer = async () => {
         if (!referTo) return
-        await api.put(`/emergency/${selected._id}/status`, { status: 'Transferred', transferredTo: referTo, denialReason: referNote })
-        setAction(null); setSelected(null); setReferTo(''); setReferNote('')
-        setMsg(`Patient referred to ${referTo}`)
-        load()
+        try {
+            await api.put(`/emergency/${selected._id}/status`, { status: 'Transferred', transferredTo: referTo, denialReason: referNote })
+            setAction(null); setSelected(null); setReferTo(''); setReferNote('')
+            setMsg(`Patient referred to ${referTo}`)
+            load()
+        } catch (err) { alert(err.response?.data?.message || 'Failed to refer patient') }
     }
 
     const processAction = async (status) => {
-        const payload = { status }
-        if (status === 'Accepted') {
-            payload.assignedDoctor = actionForm.assignedDoctor
-            payload.replyMessage = actionForm.replyMessage
-        }
-        if (status === 'Rejected') {
-            payload.denialReason = actionForm.denialReason
-        }
-        await api.put(`/emergency/${selected._id}/status`, payload)
-        setAction(null); setSelected(null); setActionForm({ assignedDoctor: '', replyMessage: '', denialReason: '' })
-        load()
+        try {
+            const payload = { status }
+            if (status === 'Accepted') {
+                payload.assignedDoctor = actionForm.assignedDoctor
+                payload.replyMessage = actionForm.replyMessage
+            }
+            if (status === 'Rejected') {
+                payload.denialReason = actionForm.denialReason
+            }
+            await api.put(`/emergency/${selected._id}/status`, payload)
+            setAction(null); setSelected(null); setActionForm({ assignedDoctor: '', replyMessage: '', denialReason: '' })
+            load()
+        } catch (err) { alert(err.response?.data?.message || 'Failed to process action') }
     }
 
     const updateStatus = async (id, status) => {
-        await api.put(`/emergency/${id}/status`, { status })
-        load()
+        try {
+            await api.put(`/emergency/${id}/status`, { status })
+            load()
+        } catch (err) { alert(err.response?.data?.message || 'Failed to update status') }
     }
 
     const filtered = filterStatus ? requests.filter(r => r.status === filterStatus) : requests
@@ -202,7 +211,7 @@ export default function EmergenciesSection({ hospitalId }) {
                                         <CheckCircle size={13} /> Admit & Assign Bed
                                     </button>
                                 )}
-                                {req.status !== 'Admitted' && req.status !== 'Referred' && (
+                                {req.status !== 'Admitted' && req.status !== 'Transferred' && req.status !== 'Rejected' && (
                                     <button
                                         className="btn btn-sm"
                                         style={{ background: '#6d28d9', color: 'white' }}

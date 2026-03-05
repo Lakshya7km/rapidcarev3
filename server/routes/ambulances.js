@@ -10,7 +10,7 @@ router.get('/', auth(['hospital', 'superadmin']), async (req, res) => {
     } catch (e) { res.status(500).json({ message: e.message }); }
 });
 
-router.get('/:ambulanceId', async (req, res) => {
+router.get('/:ambulanceId', auth(['hospital', 'ambulance', 'superadmin']), async (req, res) => {
     try {
         const a = await Ambulance.findOne({ ambulanceId: req.params.ambulanceId }, '-password');
         if (!a) return res.status(404).json({ message: 'Not found' });

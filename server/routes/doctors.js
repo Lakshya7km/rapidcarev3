@@ -99,14 +99,23 @@ router.post('/geofence-checkin', auth(['doctor']), async (req, res) => {
         if (!doctor) return res.status(404).json({ message: 'Doctor not found' });
         const hospital = await Hospital.findOne({ hospitalId: doctor.hospitalId });
         if (!hospital?.location?.lat) return res.status(400).json({ message: 'Hospital location not set' });
-        const dist = Math.sqrt(Math.pow(lat - hospital.location.lat, 2) + Math.pow(lng - hospital.location.lng, 2)) * 111;
+        const R = 6371; // Earth radius km
+        const dLat = (lat - hospital.location.lat) * (Math.PI / 180);
+        const dLon = (lng - hospital.location.lng) * (Math.PI / 180);
+        const havA = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(hospital.location.lat * (Math.PI / 180)) * Math.cos(lat * (Math.PI / 180)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        const havC = 2 * Math.atan2(Math.sqrt(havA), Math.sqrt(1 - havA));
+        const dist = R * havC;
         if (dist > 0.1) return res.status(400).json({ message: `Too far from hospital (${(dist * 1000).toFixed(0)}m). Must be within 100m.`, distance: dist });
         const today = new Date(); today.setHours(0, 0, 0, 0);
         let a = await Attendance.findOne({ doctorId, date: today });
         if (!a) a = new Attendance({ doctorId, hospitalId: doctor.hospitalId, date: today, availability: 'Present', checkIn: new Date(), method: 'Geofence' });
         else { a.checkIn = new Date(); a.availability = 'Present'; a.method = 'Geofence'; }
         await a.save();
-        await Doctor.findOneAndUpdate({ doctorId }, { availability: 'Available' });
+        const updatedDoctor = await Doctor.findOneAndUpdate({ doctorId }, { availability: 'Available' }, { new: true }).select('-password');
+        if (global.io) {
+            global.io.emit('doctor:update', updatedDoctor);
+            global.io.to(doctor.hospitalId).emit('doctor:update', updatedDoctor);
+        }
         res.json({ success: true, attendance: a, distance: dist });
     } catch (e) { res.status(500).json({ message: e.message }); }
 });
@@ -135,6 +144,10 @@ router.post('/attendance-override', auth(['hospital', 'superadmin']), async (req
             a.availability = availability;
             a.markedBy = 'Reception';
             if (availability === 'Present' && !a.checkIn) a.checkIn = new Date();
+            if (availability === 'Absent' && !a.checkOut) {
+                a.checkOut = new Date();
+                if (a.checkIn) a.totalHours = ((a.checkOut - a.checkIn) / 3600000).toFixed(1);
+            }
         } else {
             a = new Attendance({
                 doctorId,
@@ -147,8 +160,13 @@ router.post('/attendance-override', auth(['hospital', 'superadmin']), async (req
         }
         await a.save();
         // Also update doctor's immediate status
-        const doctorStatus = availability === 'Present' ? 'Available' : 'Unavailable';
-        await Doctor.findOneAndUpdate({ doctorId }, { availability: doctorStatus });
+        const doctorStatus = availability === 'Present' ? 'Available' : (availability === 'Absent' ? 'Unavailable' : 'On Leave');
+        const d = await Doctor.findOneAndUpdate({ doctorId }, { availability: doctorStatus }, { new: true }).select('-password');
+
+        if (global.io) {
+            global.io.emit('doctor:update', d);
+            global.io.to(hospitalId).emit('doctor:update', d);
+        }
         res.json(a);
     } catch (e) { res.status(500).json({ message: e.message }); }
 });

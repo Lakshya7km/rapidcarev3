@@ -22,7 +22,7 @@ export default function AdminPortal() {
     const [dbLoading, setDbLoading] = useState(false)
     const [loading, setLoading] = useState(true)
     const [msg, setMsg] = useState('')
-    const [regForm, setRegForm] = useState({ hospitalId: '', name: '', contact: '', password: 'test@1234', address: { street: '', city: '', district: '', state: '' }, googleMapUrl: '' })
+    const [regForm, setRegForm] = useState({ hospitalId: '', name: '', contact: '', password: '', address: { street: '', city: '', district: '', state: '' }, googleMapUrl: '' })
 
     useEffect(() => {
         api.get('/admin/stats').then(r => setStats(r.data)).finally(() => setLoading(false))
@@ -35,18 +35,22 @@ export default function AdminPortal() {
     }, [tab, dbCol])
 
     const register = async () => {
-        if (regForm.googleMapUrl) {
-            const m = regForm.googleMapUrl.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/)
-            if (m) regForm.location = { lat: parseFloat(m[1]), lng: parseFloat(m[2]) }
-        }
-        await api.post('/admin/register-hospital', regForm)
-        setMsg('Hospital registered!'); setTab('dashboard')
-        api.get('/admin/stats').then(r => setStats(r.data))
+        try {
+            if (regForm.googleMapUrl) {
+                const m = regForm.googleMapUrl.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/)
+                if (m) regForm.location = { lat: parseFloat(m[1]), lng: parseFloat(m[2]) }
+            }
+            await api.post('/admin/register-hospital', regForm)
+            setMsg('Hospital registered!'); setTab('dashboard')
+            api.get('/admin/stats').then(r => setStats(r.data))
+        } catch (err) { alert(err.response?.data?.message || 'Registration failed') }
     }
 
     const deleteRecord = async (id) => {
-        await api.delete(`/admin/master/${dbCol}/${id}`)
-        setDbData(d => d.filter(x => x._id !== id))
+        try {
+            await api.delete(`/admin/master/${dbCol}/${id}`)
+            setDbData(d => d.filter(x => x._id !== id))
+        } catch (err) { alert(err.response?.data?.message || 'Failed to delete record') }
     }
 
     const refreshDb = () => {

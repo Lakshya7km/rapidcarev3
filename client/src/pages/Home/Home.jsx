@@ -44,11 +44,16 @@ export default function Home() {
         try {
             const { data } = await api.get('/hospitals')
             setHospitals(data)
-            data.forEach(h => {
-                if (!bloodStock[h.hospitalId]) {
-                    api.get(`/bloodbank?hospitalId=${h.hospitalId}`).then(r => setBloodStock(prev => ({ ...prev, [h.hospitalId]: r.data }))).catch(() => { })
-                }
+
+            const promises = data.map(h =>
+                api.get(`/bloodbank?hospitalId=${h.hospitalId}`).then(r => ({ id: h.hospitalId, stock: r.data })).catch(() => null)
+            )
+            const results = await Promise.all(promises)
+            const newStock = {}
+            results.forEach(res => {
+                if (res) newStock[res.id] = res.stock
             })
+            setBloodStock(prev => ({ ...prev, ...newStock }))
         } catch (err) { }
     }
 
@@ -70,15 +75,7 @@ export default function Home() {
     const openRole = (role) => {
         setActive(role)
         setError('')
-        // autofill demo creds
-        const creds = {
-            hospital: { username: 'AIIMS-RPR', password: 'test@1234' },
-            doctor: { username: 'DOC-AIIMS-01', password: 'test@1234' },
-            nurse: { username: 'NURSE-AIIMS-01', password: 'test@1234' },
-            ambulance: { username: 'AMB-AIIMS-01', password: 'test@1234' },
-            superadmin: { username: 'admin', password: 'test@1234' },
-        }
-        setForm(creds[role.key])
+        setForm({ username: '', password: '' })
         // Scroll to section manually to replicate HTML feel
         setTimeout(() => {
             document.getElementById('login-section')?.scrollIntoView({ behavior: 'smooth' })
@@ -89,16 +86,15 @@ export default function Home() {
         e.preventDefault()
         setLoading(true); setError('')
         try {
-            const { data } = await api.post('/auth/login', { role: active.key, username: form.username.trim(), password: form.password })
-            const userObj = { role: active.key, ...(data.doctor || data.nurse || data.admin || {}), username: form.username.trim(), hospitalId: data.hospitalId || data.doctor?.hospitalId || data.nurse?.hospitalId }
-            if (data.ambulance) Object.assign(userObj, data.ambulance)
-            login(data.token, userObj)
+            const r = await api.post('/auth/login', { role: active.key, username: form.username.trim(), password: form.password })
+            login(r.data.token, r.data.user)
             navigate(active.route)
         } catch (err) {
             setError(err.response?.data?.message || 'Login failed')
-        } finally { setLoading(false) }
+        } finally {
+            setLoading(false)
+        }
     }
-
     return (
         <div className="home-page-classic">
             {/* Navbar */}
@@ -159,12 +155,7 @@ export default function Home() {
                         </button>
                     </div>
 
-                    <p style={{ color: '#64748b', fontSize: '0.95rem', margin: '0 0 1.5rem', lineHeight: 1.5 }}>
-                        Can't find blood here? Check the official Government portal for **All India** real-time blood availability across all registered blood banks.
-                    </p>
-                    <a href="https://eraktkosh.mohfw.gov.in/eraktkoshPortal/#/publicPages/bloodAvailabilitySearch" target="_blank" rel="noreferrer" className="btn btn-primary" style={{ background: '#dc2626', border: 'none', padding: '12px 24px', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 8, borderRadius: 8 }}>
-                        <Droplets size={18} /> Visit eRaktKosh Portal
-                    </a>
+
 
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1rem' }}>
                         {hospitals.map(h => {

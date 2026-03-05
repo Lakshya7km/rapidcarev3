@@ -2,7 +2,7 @@ const router = require('express').Router();
 const auth = require('../middleware/auth');
 const Bed = require('../models/Bed');
 
-router.get('/', async (req, res) => {
+router.get('/', auth(['hospital', 'nurse', 'superadmin']), async (req, res) => {
     try {
         const { hospitalId, status, bedType } = req.query;
         const q = {};

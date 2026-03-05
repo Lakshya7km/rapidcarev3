@@ -15,15 +15,19 @@ export default function DoctorsSection({ hospitalId }) {
     useEffect(() => { load() }, [hospitalId])
 
     const create = async () => {
-        await api.post('/doctors', { ...form, hospitalId })
-        setAdding(false); load(); setMsg('Doctor registered!')
-        setForm({ doctorId: '', name: '', speciality: '', qualification: '', experience: '' })
+        try {
+            await api.post('/doctors', { ...form, hospitalId })
+            setAdding(false); load(); setMsg('Doctor registered!')
+            setForm({ doctorId: '', name: '', speciality: '', qualification: '', experience: '' })
+        } catch (err) { alert(err.response?.data?.message || 'Failed to register doctor') }
     }
 
     const toggleAvailability = async (doc, forceStatus) => {
-        const next = forceStatus || (doc.availability === 'Available' ? 'Unavailable' : 'Available')
-        await api.post(`/doctors/attendance-override`, { doctorId: doc.doctorId, hospitalId, availability: next === 'Available' ? 'Present' : 'Absent' })
-        load() // Refresh to get latest 'lastUpdated' from backend
+        try {
+            const next = forceStatus || (doc.availability === 'Available' ? 'Unavailable' : 'Available')
+            await api.post(`/doctors/attendance-override`, { doctorId: doc.doctorId, hospitalId, availability: next === 'Available' ? 'Present' : 'Absent' })
+            load() // Refresh to get latest 'lastUpdated' from backend
+        } catch (err) { alert(err.response?.data?.message || 'Failed to update availability') }
     }
 
     const getRelativeTime = (d) => {
@@ -90,7 +94,7 @@ export default function DoctorsSection({ hospitalId }) {
                             </div>
                         ))}
                         <p style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 12 }}>
-                            Default password: <strong>test@1234</strong> — Doctor can change in their portal
+                            Doctors can change their login password in their personal portal.
                         </p>
                         <button className="btn btn-primary btn-full" onClick={create}>Register</button>
                     </div>

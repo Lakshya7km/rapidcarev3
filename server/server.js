@@ -58,7 +58,7 @@ io.on('connection', (socket) => {
         try {
             const Ambulance = require('./models/Ambulance');
             await Ambulance.findOneAndUpdate({ ambulanceId }, { location: { lat, lng, updatedAt: new Date() } });
-        } catch (_) { }
+        } catch (err) { console.error('Socket DB Error (Location):', err.message); }
     });
 
     // Ambulance status change
@@ -68,7 +68,7 @@ io.on('connection', (socket) => {
         try {
             const Ambulance = require('./models/Ambulance');
             await Ambulance.findOneAndUpdate({ ambulanceId }, { status });
-        } catch (_) { }
+        } catch (err) { console.error('Socket DB Error (Status):', err.message); }
     });
 
     // Bed status update

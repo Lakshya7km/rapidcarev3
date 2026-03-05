@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import api from '../../lib/api'
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet'
 import L from 'leaflet'
+import socket from '../../lib/socket'
 
 import '../Home/Home.css' // Reuse the classic styling
 
@@ -40,19 +41,30 @@ export default function PublicPortal() {
 
         // Sort by nearest if we have user location
         if (userPos) {
+            const toRad = (v) => v * Math.PI / 180
             f = [...f].sort((a, b) => {
-                const dA = a.location ? Math.sqrt(Math.pow(a.location.lat - userPos.lat, 2) + Math.pow(a.location.lng - userPos.lng, 2)) : 999
-                const dB = b.location ? Math.sqrt(Math.pow(b.location.lat - userPos.lat, 2) + Math.pow(b.location.lng - userPos.lng, 2)) : 999
-                return dA - dB
+                if (!a.location || !b.location) return 0
+                const R = 6371
+                const dLatA = toRad(a.location.lat - userPos.lat), dLonA = toRad(a.location.lng - userPos.lng)
+                const distA = R * 2 * Math.atan2(Math.sqrt(Math.sin(dLatA / 2) ** 2 + Math.cos(toRad(userPos.lat)) * Math.cos(toRad(a.location.lat)) * Math.sin(dLonA / 2) ** 2), Math.sqrt(1 - (Math.sin(dLatA / 2) ** 2 + Math.cos(toRad(userPos.lat)) * Math.cos(toRad(a.location.lat)) * Math.sin(dLonA / 2) ** 2)))
+                const dLatB = toRad(b.location.lat - userPos.lat), dLonB = toRad(b.location.lng - userPos.lng)
+                const distB = R * 2 * Math.atan2(Math.sqrt(Math.sin(dLatB / 2) ** 2 + Math.cos(toRad(userPos.lat)) * Math.cos(toRad(b.location.lat)) * Math.sin(dLonB / 2) ** 2), Math.sqrt(1 - (Math.sin(dLatB / 2) ** 2 + Math.cos(toRad(userPos.lat)) * Math.cos(toRad(b.location.lat)) * Math.sin(dLonB / 2) ** 2)))
+                return distA - distB
             }).map(h => {
-                const dA = h.location ? Math.sqrt(Math.pow(h.location.lat - userPos.lat, 2) + Math.pow(h.location.lng - userPos.lng, 2)) * 111 : null
-                return { ...h, distance: dA }
+                if (!h.location) return h
+                const R = 6371
+                const dLat = toRad(h.location.lat - userPos.lat), dLon = toRad(h.location.lng - userPos.lng)
+                const dist = R * 2 * Math.atan2(Math.sqrt(Math.sin(dLat / 2) ** 2 + Math.cos(toRad(userPos.lat)) * Math.cos(toRad(h.location.lat)) * Math.sin(dLon / 2) ** 2), Math.sqrt(1 - (Math.sin(dLat / 2) ** 2 + Math.cos(toRad(userPos.lat)) * Math.cos(toRad(h.location.lat)) * Math.sin(dLon / 2) ** 2)))
+                return { ...h, distance: dist }
             })
         }
         setFiltered(f)
+    }, [search, hospitals, userPos])
 
-        // Parallel fetch for beds and docs
-        f.forEach(h => {
+    useEffect(() => {
+        if (!socket.connected) socket.connect()
+        // Parallel fetch for beds and docs (only trigger once per hospital)
+        hospitals.forEach(h => {
             if (!bedSummary[h.hospitalId]) {
                 const now = new Date()
                 api.get(`/beds/summary/${h.hospitalId}`).then(r => setBedSummary(prev => ({ ...prev, [h.hospitalId]: r.data }))).catch(() => { })
@@ -64,7 +76,21 @@ export default function PublicPortal() {
                 api.get(`/announcements?hospitalId=${h.hospitalId}`).then(r => setAnnouncements(prev => ({ ...prev, [h.hospitalId]: r.data }))).catch(() => { })
             }
         })
-    }, [search, hospitals, userPos])
+
+        const handleDocUpdate = (d) => {
+            setDocSummary(prev => {
+                const list = prev[d.hospitalId] || []
+                const newList = list.map(x => x.doctorId === d.doctorId ? { ...x, ...d } : x)
+                return { ...prev, [d.hospitalId]: newList }
+            })
+        }
+        socket.on('doctor:update', handleDocUpdate)
+
+        return () => {
+            socket.off('doctor:update', handleDocUpdate)
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [hospitals])
 
     const submitDonation = async (e) => {
         e.preventDefault()
@@ -207,7 +233,7 @@ export default function PublicPortal() {
                             const vacantBeds = b ? Object.values(b).reduce((acc, curr) => acc + curr.vacant, 0) : 0
 
                             const d = docSummary[h.hospitalId] || []
-                            const docs = d.filter(doc => doc.availability === 'Present').slice(0, 2)
+                            const docs = d.filter(doc => doc.availability === 'Available').slice(0, 2)
                             const blood = bloodStock[h.hospitalId] || []
                             const availableBlood = blood.filter(bk => bk.units > 0)
 
@@ -239,7 +265,7 @@ export default function PublicPortal() {
                                         <div style={{ marginBottom: '1rem' }}>
                                             <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', fontWeight: 700, color: '#6c757d', marginBottom: '0.5rem', letterSpacing: '0.5px' }}>Core Expertise</div>
                                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-                                                {(h.treatment || h.services || ['General Care']).slice(0, 3).map(s => (
+                                                {((h.treatment?.length ? h.treatment : h.services?.length ? h.services : null) || ['General Care']).slice(0, 3).map(s => (
                                                     <span key={s} style={{ background: 'rgba(11, 110, 253, 0.05)', color: '#0b6efd', padding: '4px 10px', borderRadius: 20, fontSize: '0.7rem', fontWeight: 600 }}>{s}</span>
                                                 ))}
                                             </div>
@@ -260,16 +286,18 @@ export default function PublicPortal() {
                                                 </div>
                                             )}
                                             {/* Doctors */}
-                                            <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#6c757d', textTransform: 'uppercase', marginBottom: 4 }}>👨‍⚕️ Medical Staff</div>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                                                <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#6c757d', textTransform: 'uppercase' }}>👨‍⚕️ Medical Staff</div>
+                                                {updatedAgo && <span style={{ fontSize: '0.65rem', color: '#9ca3af' }}>⏱ {updatedAgo}</span>}
+                                            </div>
                                             {d.length > 0 ? docs.length > 0 ? docs.map(doc => (
-                                                <div key={doc._id} style={{ fontSize: '0.83rem', fontWeight: 600, marginBottom: 2 }}>
-                                                    👨‍⚕️ {doc.name} <span style={{ fontWeight: 400, color: '#6c757d', fontSize: '0.75rem' }}>{doc.specialty || doc.specialization || ''}</span>
+                                                <div key={doc._id} style={{ fontSize: '0.83rem', fontWeight: 600, marginBottom: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                    <span>👨‍⚕️ {doc.name} <span style={{ fontWeight: 400, color: '#6c757d', fontSize: '0.75rem' }}>{doc.specialty || doc.specialization || ''}</span></span>
+                                                    <span style={{ fontSize: '0.65rem', background: doc.availability === 'Available' ? '#dcfce7' : '#fee2e2', color: doc.availability === 'Available' ? '#166534' : '#991b1b', padding: '1px 6px', borderRadius: 10, fontWeight: 700 }}>
+                                                        {doc.availability || 'Absent'}
+                                                    </span>
                                                 </div>
                                             )) : <small style={{ color: '#6c757d' }}>No doctors currently present</small> : <small style={{ color: '#6c757d' }}>Syncing staff...</small>}
-                                            {/* Last updated */}
-                                            {updatedAgo && (
-                                                <div style={{ fontSize: '0.68rem', color: '#9ca3af', marginTop: 6 }}>⏱ Data fetched {updatedAgo}</div>
-                                            )}
                                         </div>
                                     </div>
 

@@ -77,7 +77,7 @@ router.get('/:id/stats', auth(['hospital']), async (req, res) => {
 });
 
 // Attendance QR scan endpoint
-router.get('/:id/attendance-scan', async (req, res) => {
+router.get('/:id/attendance-scan', auth(['hospital', 'nurse', 'superadmin']), async (req, res) => {
     try {
         const { type, doctorId } = req.query;
         if (!doctorId) return res.status(400).json({ message: 'doctorId required' });

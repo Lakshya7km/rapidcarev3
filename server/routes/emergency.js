@@ -16,6 +16,10 @@ router.get('/', auth(['hospital', 'ambulance', 'superadmin']), async (req, res) 
 
 router.post('/', async (req, res) => {
     try {
+        const { hospitalId, patientName, emergencyType } = req.body;
+        if (!hospitalId || !patientName || !emergencyType) {
+            return res.status(400).json({ message: 'Hospital ID, Patient Name, and Emergency Type are required' });
+        }
         const er = new EmergencyRequest(req.body);
         await er.save();
         // Emit via socket (referenced in server.js)
@@ -36,6 +40,9 @@ router.put('/:id/status', auth(['hospital']), async (req, res) => {
         const er = await EmergencyRequest.findByIdAndUpdate(req.params.id, update, { new: true });
 
         if (status === 'Transferred' && transferredTo) {
+            if (er.referredFrom === transferredTo) {
+                return res.status(400).json({ message: 'Cannot refer patient back to the origin hospital' });
+            }
             // Clone the request for the receiving hospital
             const cloneData = er.toObject();
             delete cloneData._id;

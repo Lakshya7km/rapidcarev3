@@ -10,7 +10,7 @@ router.get('/', async (req, res) => {
 });
 
 // Upsert by blood type (used by reception BloodBankSection)
-router.post('/upsert', async (req, res) => {
+router.post('/upsert', auth(['hospital', 'superadmin']), async (req, res) => {
     try {
         const { hospitalId, bloodType, units } = req.body;
         let b = await BloodBank.findOne({ hospitalId, bloodType });
@@ -33,6 +33,10 @@ router.get('/donors', async (req, res) => {
 // Submit a new donor request (from Public page)
 router.post('/donors', async (req, res) => {
     try {
+        const { name, contact, hospitalId } = req.body;
+        if (!name || !contact || !hospitalId) {
+            return res.status(400).json({ message: 'Name, Contact, and Hospital ID are required' });
+        }
         const d = new Donor(req.body);
         await d.save();
         res.json(d);

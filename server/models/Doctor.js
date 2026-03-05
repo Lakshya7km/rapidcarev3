@@ -18,7 +18,6 @@ const doctorSchema = new mongoose.Schema({
 
 doctorSchema.pre('save', async function (next) {
     if (!this.isModified('password')) return next();
-    if (this.password.startsWith('$2b$')) return next();
     this.password = await bcrypt.hash(this.password, 10);
     next();
 });
