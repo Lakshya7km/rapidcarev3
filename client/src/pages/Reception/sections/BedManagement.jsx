@@ -86,9 +86,12 @@ export default function BedManagement({ hospitalId }) {
         if (bedsToDownload.length === 0) return
         setDownloading(true)
         try {
+            const baseUrl = window.location.origin
             // Build an HTML page with all QR label cards
             const cards = await Promise.all(bedsToDownload.map(async (bed) => {
-                const qrDataUrl = await QRCode.toDataURL(bed.bedId, { width: 180, margin: 1 })
+                // Encode a full URL so any camera app can open the scan page directly
+                const bedUrl = `${baseUrl}/bed/${bed.bedId}`
+                const qrDataUrl = await QRCode.toDataURL(bedUrl, { width: 180, margin: 1 })
                 return `
                 <div class="label">
                     <div class="hospital">${hospitalId}</div>

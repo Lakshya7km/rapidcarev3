@@ -10,6 +10,7 @@ import NursePortal from './pages/Nurse/NursePortal'
 import AmbulancePortal from './pages/Ambulance/AmbulancePortal'
 import AdminPortal from './pages/Admin/AdminPortal'
 import PublicPortal from './pages/Public/PublicPortal'
+import BedScanPage from './pages/Bed/BedScanPage'
 
 function Protected({ children, role }) {
   const { user, loading } = useAuth()
@@ -26,6 +27,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/public" element={<PublicPortal />} />
+          <Route path="/bed/:bedId" element={<BedScanPage />} />
           <Route path="/reception/*" element={<Protected role="hospital"><ReceptionPortal /></Protected>} />
           <Route path="/doctor/*" element={<Protected role="doctor"><DoctorPortal /></Protected>} />
           <Route path="/nurse/*" element={<Protected role="nurse"><NursePortal /></Protected>} />
@@ -37,3 +39,4 @@ export default function App() {
     </AuthProvider>
   )
 }
+

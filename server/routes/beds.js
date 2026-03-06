@@ -13,6 +13,17 @@ router.get('/', auth(['hospital', 'nurse', 'superadmin']), async (req, res) => {
     } catch (e) { res.status(500).json({ message: e.message }); }
 });
 
+// Public: get a single bed by bedId (used by QR scan landing page)
+router.get('/public/:bedId', async (req, res) => {
+    try {
+        const bed = await Bed.findOne({ bedId: req.params.bedId });
+        if (!bed) return res.status(404).json({ message: 'Bed not found' });
+        res.json(bed);
+    } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+
+
 router.post('/bulk', auth(['hospital']), async (req, res) => {
     try {
         const { hospitalId, wardNumber, bedType, startNum, endNum } = req.body;
