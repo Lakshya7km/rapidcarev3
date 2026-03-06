@@ -67,11 +67,30 @@ export default function PublicPortal() {
         hospitals.forEach(h => {
             if (!bedSummary[h.hospitalId]) {
                 const now = new Date()
-                api.get(`/beds/summary/${h.hospitalId}`).then(r => setBedSummary(prev => ({ ...prev, [h.hospitalId]: r.data }))).catch(() => { })
+                api.get(`/beds/summary/${h.hospitalId}`).then(r => {
+                    setBedSummary(prev => ({ ...prev, [h.hospitalId]: r.data.beds }));
+                    if (r.data.lastUpdated) {
+                        setFetchedAt(prev => ({ ...prev, [`bed_${h.hospitalId}`]: new Date(r.data.lastUpdated) }));
+                    }
+                }).catch(() => { })
                 api.get(`/doctors?hospitalId=${h.hospitalId}`).then(r => setDocSummary(prev => ({ ...prev, [h.hospitalId]: r.data }))).catch(() => { })
                 api.get(`/bloodbank?hospitalId=${h.hospitalId}`).then(r => {
                     setBloodStock(prev => ({ ...prev, [h.hospitalId]: r.data }))
-                    setFetchedAt(prev => ({ ...prev, [h.hospitalId]: now }))
+                    
+                    // Find actual lastUpdated from bloodbank records
+                    let latestStockUpdate = null;
+                    if (Array.isArray(r.data)) {
+                        r.data.forEach(b => {
+                            if (b.lastUpdated) {
+                                if (!latestStockUpdate || new Date(b.lastUpdated) > latestStockUpdate) {
+                                    latestStockUpdate = new Date(b.lastUpdated);
+                                }
+                            }
+                        });
+                    }
+                    if (latestStockUpdate) {
+                        setFetchedAt(prev => ({ ...prev, [`blood_${h.hospitalId}`]: latestStockUpdate }));
+                    }
                 }).catch(() => { })
                 api.get(`/announcements?hospitalId=${h.hospitalId}`).then(r => setAnnouncements(prev => ({ ...prev, [h.hospitalId]: r.data }))).catch(() => { })
             }
@@ -380,10 +399,10 @@ export default function PublicPortal() {
 
                             {bedSummary[selected.hospitalId] && (
                                 <div style={{ background: '#f8f9fa', padding: '1rem', borderRadius: 8, marginTop: '1rem' }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                                        <strong style={{ fontSize: '0.9rem', display: 'block' }}>🛏️ Bed Statistics:</strong>
-                                        <span style={{ fontSize: '0.75rem', color: '#6c757d', fontWeight: 500 }}>
-                                            {fetchedAt[selected.hospitalId] ? `Updated: ${new Date(fetchedAt[selected.hospitalId]).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}` : ''}
+                                    <div style={{ display: 'flex', alignItems: 'center', marginBottom: 12, gap: 8 }}>
+                                        <strong style={{ fontSize: '1rem', display: 'block' }}>🛏️ Bed Statistics:</strong>
+                                        <span style={{ fontSize: '0.8rem', color: '#6c757d', fontWeight: 500 }}>
+                                            {fetchedAt[`bed_${selected.hospitalId}`] ? `Last updated: ${new Date(fetchedAt[`bed_${selected.hospitalId}`]).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })} ${new Date(fetchedAt[`bed_${selected.hospitalId}`]).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })}` : ''}
                                         </span>
                                     </div>
                                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))', gap: 12 }}>
@@ -400,10 +419,10 @@ export default function PublicPortal() {
 
                             {bloodStock[selected.hospitalId] && bloodStock[selected.hospitalId].length > 0 && (
                                 <div style={{ background: '#f8f9fa', padding: '1rem', borderRadius: 8, marginTop: '1rem' }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                                        <strong style={{ fontSize: '0.9rem', display: 'block' }}>🩸 Blood Availability:</strong>
-                                        <span style={{ fontSize: '0.75rem', color: '#6c757d', fontWeight: 500 }}>
-                                            {fetchedAt[selected.hospitalId] ? `Updated: ${new Date(fetchedAt[selected.hospitalId]).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}` : ''}
+                                    <div style={{ display: 'flex', alignItems: 'center', marginBottom: 12, gap: 8 }}>
+                                        <strong style={{ fontSize: '1rem', display: 'block' }}>🩸 Blood Availability:</strong>
+                                        <span style={{ fontSize: '0.8rem', color: '#6c757d', fontWeight: 500 }}>
+                                            {fetchedAt[`blood_${selected.hospitalId}`] ? `Last updated: ${new Date(fetchedAt[`blood_${selected.hospitalId}`]).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })} ${new Date(fetchedAt[`blood_${selected.hospitalId}`]).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })}` : ''}
                                         </span>
                                     </div>
                                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>

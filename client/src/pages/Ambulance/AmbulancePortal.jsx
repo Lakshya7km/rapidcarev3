@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import api from '../../lib/api'
@@ -25,6 +25,7 @@ export default function AmbulancePortal() {
     const [loading, setLoading] = useState(true)
     const [msg, setMsg] = useState('')
     const [heartbeatInterval, setHeartbeatInterval] = useState(null)
+    const hbRef = useRef(null)
 
 
     const ambulanceId = user?.ambulanceId || user?.ref

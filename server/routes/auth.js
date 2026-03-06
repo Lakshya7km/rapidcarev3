@@ -37,10 +37,11 @@ router.post('/login', async (req, res) => {
         const userObj = {
             id: user._id,
             role,
+            ref: username,
             username: username,
             hospitalId: payload.hospitalId,
-            ...(role === 'doctor' ? { name: user.name, speciality: user.speciality } : {}),
-            ...(role === 'nurse' ? { name: user.name } : {}),
+            ...(role === 'doctor' ? { name: user.name, speciality: user.speciality, doctorId: user.doctorId } : {}),
+            ...(role === 'nurse' ? { name: user.name, nurseId: user.nurseId } : {}),
             ...(role === 'ambulance' ? { vehicleNumber: user.vehicleNumber, ambulanceId: user.ambulanceId } : {})
         };
 
