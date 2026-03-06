@@ -38,6 +38,8 @@ export default function BedScanPage() {
             return
         }
         setUpdating(true)
+        setError('')
+        setMsg('')
         try {
             const r = await api.patch(`/beds/${bedId}/status`, {
                 status,
@@ -68,7 +70,7 @@ export default function BedScanPage() {
                 <div style={{ fontSize: 48, marginBottom: 16 }}>🛏️</div>
                 <h2 style={{ color: '#dc2626', marginBottom: 8 }}>Bed Not Found</h2>
                 <p style={{ color: '#6b7280', fontSize: 14, marginBottom: 24 }}>{error}</p>
-                <button className="btn btn-primary" onClick={() => navigate(-1)}>Go Back</button>
+                <button className="btn btn-primary" onClick={() => navigate('/')}>Go Back</button>
             </div>
         )
     }
@@ -174,7 +176,7 @@ export default function BedScanPage() {
                     <button
                         className="btn btn-ghost"
                         style={{ width: '100%', color: '#64748b' }}
-                        onClick={() => navigate(-1)}
+                        onClick={() => navigate('/')}
                     >
                         ← Go Back
                     </button>
