@@ -12,12 +12,13 @@ const FEATURES = [
 ]
 
 const ROLES = [
-    { key: 'hospital', label: 'Reception', sub: 'Operations', icon: '🏢', color: '#0d6efd', userLabel: 'Node ID', userPlace: 'HOSP-001', passLabel: 'Security Code', passPlace: '••••••••', route: '/reception' },
-    { key: 'doctor', label: 'Doctor', sub: 'Clinical Control', icon: '👨‍⚕️', color: '#198754', userLabel: 'Staff ID', userPlace: 'DOC-100', passLabel: 'Passphrase', passPlace: '••••••••', route: '/doctor' },
-    { key: 'ambulance', label: 'Dispatcher', sub: 'Emergency Fleet', icon: '🚑', color: '#dc3545', userLabel: 'Fleet Unit ID', userPlace: 'AMB-001', passLabel: 'Dispatch Code', passPlace: '••••••••', route: '/ambulance' },
-    { key: 'nurse', label: 'Nurse', sub: 'Ward Analytics', icon: '👩‍⚕️', color: '#0dcaf0', userLabel: 'Staff ID', userPlace: 'NUR-100', passLabel: 'Security Code', passPlace: '••••••••', route: '/nurse' },
-    { key: 'superadmin', label: 'Authority', sub: 'System Master', icon: '🛡️', color: '#212529', userLabel: 'Admin User', userPlace: 'Administrator', passLabel: 'Authority Key', passPlace: '••••••••', route: '/admin' },
+    { key: 'hospital', label: 'Reception', sub: 'Operations', icon: '🏢', color: '#0d6efd', userLabel: 'ID', userPlace: 'HOSP-001', passLabel: 'Password', passPlace: '••••••••', route: '/reception' },
+    { key: 'doctor', label: 'Doctor', sub: 'Clinical Control', icon: '👨‍⚕️', color: '#198754', userLabel: 'ID', userPlace: 'DOC-100', passLabel: 'Password', passPlace: '••••••••', route: '/doctor' },
+    { key: 'ambulance', label: 'Dispatcher', sub: 'Emergency Fleet', icon: '🚑', color: '#dc3545', userLabel: 'ID', userPlace: 'AMB-001', passLabel: 'Password', passPlace: '••••••••', route: '/ambulance' },
+    { key: 'nurse', label: 'Nurse', sub: 'Ward Analytics', icon: '👩‍⚕️', color: '#0dcaf0', userLabel: 'ID', userPlace: 'NUR-100', passLabel: 'Password', passPlace: '••••••••', route: '/nurse' },
+    { key: 'superadmin', label: 'Authority', sub: 'System Master', icon: '🛡️', color: '#212529', userLabel: 'ID', userPlace: 'admin', passLabel: 'Password', passPlace: '••••••••', route: '/admin' },
 ]
+
 
 const BLOOD_COLORS = {
     'A+': '#ef4444', 'A-': '#f97316', 'B+': '#8b5cf6', 'B-': '#a855f7',

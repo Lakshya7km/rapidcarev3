@@ -6,6 +6,8 @@ router.get('/', async (req, res) => {
     try {
         const { hospitalId } = req.query;
         const q = hospitalId ? { hospitalId } : {};
+        // Filter out expired announcements
+        q.$or = [{ expiresAt: null }, { expiresAt: { $gt: new Date() } }];
         res.json(await Announcement.find(q).sort({ createdAt: -1 }));
     } catch (e) { res.status(500).json({ message: e.message }); }
 });
