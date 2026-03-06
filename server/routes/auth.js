@@ -41,7 +41,7 @@ router.post('/login', async (req, res) => {
             hospitalId: payload.hospitalId,
             ...(role === 'doctor' ? { name: user.name, speciality: user.speciality } : {}),
             ...(role === 'nurse' ? { name: user.name } : {}),
-            ...(role === 'ambulance' ? { vehicleNumber: user.vehicleNumber } : {})
+            ...(role === 'ambulance' ? { vehicleNumber: user.vehicleNumber, ambulanceId: user.ambulanceId } : {})
         };
 
         if (role === 'ambulance') {
