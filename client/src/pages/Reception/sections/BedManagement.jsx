@@ -56,7 +56,10 @@ export default function BedManagement({ hospitalId }) {
     }
 
     const handleQRScan = (data) => {
-        const bedId = data.trim()
+        // Data might be a full URL like "http://localhost:5173/bed/AIIMS-RPR-W1-B001" or just the ID
+        const urlParts = data.trim().split('/')
+        const bedId = urlParts[urlParts.length - 1]
+
         const bed = beds.find(b => b.bedId === bedId)
         if (bed) {
             setScanMode(false)
