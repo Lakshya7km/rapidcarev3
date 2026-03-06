@@ -48,6 +48,7 @@ export default function AdminPortal() {
     }
 
     const deleteRecord = async (id) => {
+        if (!window.confirm('Are you sure you want to delete this record? This action cannot be undone.')) return;
         try {
             await api.delete(`/admin/master/${dbCol}/${id}`)
             setDbData(d => d.filter(x => x._id !== id))
@@ -129,7 +130,7 @@ export default function AdminPortal() {
                             {['street', 'city', 'district', 'state'].map(k => (
                                 <div className="form-group" key={k}>
                                     <label className="form-label">{k.charAt(0).toUpperCase() + k.slice(1)}</label>
-                                    <input className="form-input" value={regForm.address?.[k] || ''} onChange={e => setRegForm(p => ({ ...p, address: { ...p.address, [k]: e.target.value } }))} />
+                                    <input className="form-input" value={regForm.address?.[k] || ''} onChange={e => setRegForm(p => ({ ...p, address: { ...(p.address || {}), [k]: e.target.value } }))} />
                                 </div>
                             ))}
                         </div>

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import api from '../../lib/api'
@@ -25,7 +25,7 @@ export default function AmbulancePortal() {
     const [loading, setLoading] = useState(true)
     const [msg, setMsg] = useState('')
     const [heartbeatInterval, setHeartbeatInterval] = useState(null)
-    const locationWatch = useRef(null)
+
 
     const ambulanceId = user?.ambulanceId || user?.ref
     const ownHospitalId = user?.hospitalId || ''
@@ -62,7 +62,7 @@ export default function AmbulancePortal() {
                 })
             })
         }, 30000)
-        setHeartbeatInterval(hb)
+        hbRef.current = hb
 
         // Real-time emergency updates
         socket.on('emergency:update', (er) => {
@@ -77,7 +77,7 @@ export default function AmbulancePortal() {
         const offline = () => { api.put(`/ambulances/${ambulanceId}`, { status: 'Offline' }).catch(() => { }) }
         window.addEventListener('beforeunload', offline)
         return () => {
-            clearInterval(hb); socket.disconnect()
+            clearInterval(hbRef.current); socket.disconnect()
             window.removeEventListener('beforeunload', offline)
         }
     }, [ambulanceId])

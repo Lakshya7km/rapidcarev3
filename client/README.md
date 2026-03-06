@@ -14,3 +14,24 @@ The React Compiler is not enabled on this template because of its impact on dev 
 ## Expanding the ESLint configuration
 
 If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+
+## Bed QR deployment URL
+
+To ensure generated bed QR labels always open your deployed app (instead of localhost), set:
+
+- `VITE_PUBLIC_APP_URL=https://<your-current-railway-domain>`
+
+Behavior:
+- If `VITE_PUBLIC_APP_URL` is set, QR labels use it.
+- If not set, production runtime uses current site origin.
+- If running on localhost/dev without `VITE_PUBLIC_APP_URL`, QR generation is blocked with a clear message (to prevent localhost QR labels).
+## Bed QR deployment URL
+
+To ensure generated bed QR labels always open your deployed app (instead of localhost), set:
+
+- `VITE_PUBLIC_APP_URL=https://<your-current-railway-domain>`
+
+Behavior:
+- If `VITE_PUBLIC_APP_URL` is set, QR labels use it.
+- If not set, production runtime uses current site origin.
+- If running on localhost/dev without `VITE_PUBLIC_APP_URL`, QR generation is blocked with a clear message (to prevent localhost QR labels).

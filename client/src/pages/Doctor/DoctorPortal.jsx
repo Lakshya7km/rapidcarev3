@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import api from '../../lib/api'
@@ -44,7 +44,7 @@ export default function DoctorPortal() {
     }, [doctorId])
 
     const saveProfile = async () => {
-        const { _id, __v, password, ...update } = profForm
+        const { _id, __v, password: _, ...update } = profForm
         await api.put(`/doctors/${doctorId}`, update); setMsg('Profile updated!')
     }
 

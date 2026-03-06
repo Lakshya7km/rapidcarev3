@@ -15,7 +15,8 @@ router.get('/', auth(['hospital', 'superadmin', 'nurse', 'doctor']), async (req,
 // Create nurse
 router.post('/', auth(['hospital', 'superadmin']), async (req, res) => {
     try {
-        const n = new Nurse({ ...req.body, password: 'test@1234' });
+        if (!req.body.password) return res.status(400).json({ message: 'Password is required' });
+        const n = new Nurse({ ...req.body });
         await n.save();
         res.json(n);
     } catch (e) { res.status(500).json({ message: e.message }); }

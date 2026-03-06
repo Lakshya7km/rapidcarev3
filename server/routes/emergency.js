@@ -14,7 +14,7 @@ router.get('/', auth(['hospital', 'ambulance', 'superadmin']), async (req, res) 
     } catch (e) { res.status(500).json({ message: e.message }); }
 });
 
-router.post('/', async (req, res) => {
+router.post('/', auth(['hospital', 'ambulance', 'superadmin']), async (req, res) => {
     try {
         const { hospitalId, patientName, emergencyType } = req.body;
         if (!hospitalId || !patientName || !emergencyType) {

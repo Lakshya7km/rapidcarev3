@@ -1,10 +1,11 @@
-﻿import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import api from '../../lib/api'
 import socket from '../../lib/socket'
 import { BedDouble, UserRound, LogOut, RefreshCw, X, Search, Filter } from 'lucide-react'
 import QRScanner from '../../components/QRScanner'
+import { parseBedIdFromQR } from '../../lib/bedQr'
 
 const STATUS_COLORS = { Vacant: '#22c55e', Occupied: '#ef4444', Reserved: '#f59e0b', Cleaning: '#8b5cf6' }
 const STATUSES = ['Vacant', 'Occupied', 'Reserved', 'Cleaning']
@@ -91,18 +92,25 @@ export default function NursePortal() {
         }
     }
 
-    const handleQRScan = (data) => {
-        let bedId = data.trim()
-        // QR codes encode full URLs like https://host/bed/BED-ID — extract just the bedId
-        const match = bedId.match(/\/bed\/(.+)$/)
-        if (match) bedId = match[1]
+    const handleQRScan = async (data) => {
+        const bedId = parseBedIdFromQR(data)
         const bed = beds.find(b => b.bedId === bedId)
+        setScanMode(false)
+
         if (bed) {
-            setScanMode(false)
             // Small delay so the scan modal fully closes before opening the status modal
             setTimeout(() => setSelected(bed), 180)
-        } else {
-            setScanMode(false)
+            return
+        }
+
+        try {
+            const r = await api.get(`/beds/public/${bedId}`)
+            if (r.data?.hospitalId === user?.hospitalId) {
+                setTimeout(() => setSelected(r.data), 180)
+            } else {
+                setMsg('Scanned bed belongs to another hospital: ' + bedId)
+            }
+        } catch {
             setMsg('Bed not found: ' + bedId)
         }
     }

@@ -47,7 +47,8 @@ router.get('/doctor/:doctorId', async (req, res) => {
 // Create doctor
 router.post('/', auth(['hospital', 'superadmin']), async (req, res) => {
     try {
-        const d = new Doctor({ ...req.body, password: 'test@1234' });
+        if (!req.body.password) return res.status(400).json({ message: 'Password is required' });
+        const d = new Doctor({ ...req.body });
         await d.save();
         res.json(d);
     } catch (e) { res.status(500).json({ message: e.message }); }

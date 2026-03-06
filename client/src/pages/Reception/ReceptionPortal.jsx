@@ -48,7 +48,7 @@ export default function ReceptionPortal() {
         const fetchCount = () =>
             api.get(`/emergency?hospitalId=${hospitalId}`).then(r => {
                 setActiveEmergencies(r.data.filter(e => ['Pending', 'Accepted', 'En Route', 'Arrived'].includes(e.status)).length)
-            }).catch(() => { })
+            }).catch(err => { console.error('Failed to fetch emergency count', err) })
         fetchCount()
         socket.on('emergency:new', fetchCount)
         socket.on('emergency:update', fetchCount)

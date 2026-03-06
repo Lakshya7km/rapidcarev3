@@ -20,7 +20,8 @@ router.get('/:ambulanceId', auth(['hospital', 'ambulance', 'superadmin']), async
 
 router.post('/', auth(['hospital', 'superadmin']), async (req, res) => {
     try {
-        const a = new Ambulance({ ...req.body, password: 'test@1234' });
+        if (!req.body.password) return res.status(400).json({ message: 'Password is required' });
+        const a = new Ambulance({ ...req.body });
         await a.save();
         res.json(a);
     } catch (e) { res.status(500).json({ message: e.message }); }

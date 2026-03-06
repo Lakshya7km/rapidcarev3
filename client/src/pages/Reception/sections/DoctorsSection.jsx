@@ -6,7 +6,7 @@ export default function DoctorsSection({ hospitalId }) {
     const [docs, setDocs] = useState([])
     const [loading, setLoading] = useState(true)
     const [adding, setAdding] = useState(false)
-    const [form, setForm] = useState({ doctorId: '', name: '', speciality: '', qualification: '', experience: '' })
+    const [form, setForm] = useState({ doctorId: '', name: '', speciality: '', qualification: '', experience: '', password: '' })
     const [msg, setMsg] = useState('')
 
     const AVAIL_COLOR = { Available: '#22c55e', Unavailable: '#ef4444', 'On Leave': '#f59e0b' }
@@ -18,7 +18,7 @@ export default function DoctorsSection({ hospitalId }) {
         try {
             await api.post('/doctors', { ...form, hospitalId })
             setAdding(false); load(); setMsg('Doctor registered!')
-            setForm({ doctorId: '', name: '', speciality: '', qualification: '', experience: '' })
+            setForm({ doctorId: '', name: '', speciality: '', qualification: '', experience: '', password: '' })
         } catch (err) { alert(err.response?.data?.message || 'Failed to register doctor') }
     }
 
@@ -87,7 +87,7 @@ export default function DoctorsSection({ hospitalId }) {
                             <span className="modal-title">Register Doctor</span>
                             <button className="btn btn-ghost btn-icon" onClick={() => setAdding(false)}><X size={18} /></button>
                         </div>
-                        {[{ k: 'doctorId', l: 'Doctor ID' }, { k: 'name', l: 'Full Name' }, { k: 'speciality', l: 'Speciality' }, { k: 'qualification', l: 'Qualification' }, { k: 'experience', l: 'Experience' }].map(f => (
+                        {[{ k: 'doctorId', l: 'Doctor ID' }, { k: 'name', l: 'Full Name' }, { k: 'speciality', l: 'Speciality' }, { k: 'qualification', l: 'Qualification' }, { k: 'experience', l: 'Experience' }, { k: 'password', l: 'Login Password' }].map(f => (
                             <div className="form-group" key={f.k}>
                                 <label className="form-label">{f.l}</label>
                                 <input className="form-input" value={form[f.k]} onChange={e => setForm(p => ({ ...p, [f.k]: e.target.value }))} />
