@@ -3,27 +3,34 @@ import { Html5Qrcode } from 'html5-qrcode'
 
 export default function QRScanner({ onScan }) {
     const ref = useRef()
+    const onScanRef = useRef(onScan)
     const [error, setError] = useState('')
     const [started, setStarted] = useState(false)
 
-    const onScanRef = useRef(onScan)
+    // Keep the ref up-to-date without re-triggering the effect
     useEffect(() => { onScanRef.current = onScan }, [onScan])
 
     useEffect(() => {
         const id = 'qr-scanner-' + Date.now()
         ref.current.id = id
         const scanner = new Html5Qrcode(id)
+        let stopped = false
         scanner.start(
             { facingMode: 'environment' },
             { fps: 10, qrbox: { width: 220, height: 220 } },
-            (data) => { scanner.stop().catch(() => { }); onScanRef.current(data) },
+            (data) => {
+                if (stopped) return
+                stopped = true
+                scanner.stop().catch(() => { })
+                onScanRef.current(data)
+            },
             () => { }
         ).then(() => setStarted(true)).catch((err) => {
             setError('Camera unavailable. Please allow camera access and try again.')
             console.warn('QR Scanner Error:', err)
         })
-        return () => { scanner.stop().catch(() => { }) }
-    }, [])
+        return () => { stopped = true; scanner.stop().catch(() => { }) }
+    }, [])  // stable — runs once on mount
 
     if (error) {
         return (

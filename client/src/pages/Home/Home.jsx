@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import api from '../../lib/api'
-// No longer using unused lucide-react imports
+// Unused lucide-react imports removed during code cleanup
 import './Home.css'
 
 const FEATURES = [
@@ -20,10 +20,6 @@ const ROLES = [
 ]
 
 
-const BLOOD_COLORS = {
-    'A+': '#ef4444', 'A-': '#f97316', 'B+': '#8b5cf6', 'B-': '#a855f7',
-    'O+': '#0ea5e9', 'O-': '#06b6d4', 'AB+': '#22c55e', 'AB-': '#16a34a'
-}
 const BLOOD_TYPES = ['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-']
 
 

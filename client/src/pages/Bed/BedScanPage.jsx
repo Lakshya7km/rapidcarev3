@@ -39,6 +39,7 @@ export default function BedScanPage() {
         }
         setUpdating(true)
         setError('')
+        setMsg('')
         try {
             const r = await api.patch(`/beds/${bedId}/status`, {
                 status,

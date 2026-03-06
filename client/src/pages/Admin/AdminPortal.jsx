@@ -36,11 +36,12 @@ export default function AdminPortal() {
 
     const register = async () => {
         try {
-            if (regForm.googleMapUrl) {
-                const m = regForm.googleMapUrl.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/)
-                if (m) regForm.location = { lat: parseFloat(m[1]), lng: parseFloat(m[2]) }
+            const payload = { ...regForm }
+            if (payload.googleMapUrl) {
+                const m = payload.googleMapUrl.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/)
+                if (m) payload.location = { lat: parseFloat(m[1]), lng: parseFloat(m[2]) }
             }
-            await api.post('/admin/register-hospital', regForm)
+            await api.post('/admin/register-hospital', payload)
             setMsg('Hospital registered!'); setTab('dashboard')
             api.get('/admin/stats').then(r => setStats(r.data))
         } catch (err) { alert(err.response?.data?.message || 'Registration failed') }
