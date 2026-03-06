@@ -58,8 +58,13 @@ export default function BedManagement({ hospitalId }) {
     const handleQRScan = (data) => {
         const bedId = data.trim()
         const bed = beds.find(b => b.bedId === bedId)
-        if (bed) { setSelected(bed); setScanMode(false) }
-        else setMsg(`Bed ${bedId} not found`)
+        if (bed) {
+            setScanMode(false)
+            setTimeout(() => setSelected(bed), 180)
+        } else {
+            setScanMode(false)
+            setMsg(`Bed "${bedId}" not found`)
+        }
     }
 
     const toggleSelect = (bedId) => {

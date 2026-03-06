@@ -92,9 +92,16 @@ export default function NursePortal() {
     }
 
     const handleQRScan = (data) => {
-        const bed = beds.find(b => b.bedId === data.trim())
-        if (bed) { setSelected(bed); setScanMode(false) }
-        else setMsg('Bed not found: ' + data)
+        const bedId = data.trim()
+        const bed = beds.find(b => b.bedId === bedId)
+        if (bed) {
+            setScanMode(false)
+            // Small delay so the scan modal fully closes before opening the status modal
+            setTimeout(() => setSelected(bed), 180)
+        } else {
+            setScanMode(false)
+            setMsg('Bed not found: ' + bedId)
+        }
     }
 
     const stats = { Vacant: 0, Occupied: 0, Reserved: 0, Cleaning: 0 }
