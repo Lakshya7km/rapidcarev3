@@ -22,7 +22,7 @@ export default function AmbulancesSection({ hospitalId }) {
     const [selected, setSelected] = useState(null) // selected ambulance for detail
     const [editingEmt, setEditingEmt] = useState(null)
     const [editEmtForm, setEditEmtForm] = useState({ name: '', mobile: '' })
-    const [form, setForm] = useState({ ambulanceId: '', vehicleNumber: '', emt: { name: '', emtId: '', mobile: '' }, pilot: { name: '', pilotId: '', mobile: '' } })
+    const [form, setForm] = useState({ ambulanceId: '', vehicleNumber: '', password: '', emt: { name: '', emtId: '', mobile: '' }, pilot: { name: '', pilotId: '', mobile: '' } })
     const [assigningTask, setAssigningTask] = useState(null)
     const [taskString, setTaskString] = useState('')
 
@@ -57,7 +57,7 @@ export default function AmbulancesSection({ hospitalId }) {
         try {
             await api.post('/ambulances', { ...form, ambulanceNumber: form.vehicleNumber, hospitalId })
             setAdding(false); load()
-            setForm({ ambulanceId: '', vehicleNumber: '', emt: { name: '', emtId: '', mobile: '' }, pilot: { name: '', pilotId: '', mobile: '' } })
+            setForm({ ambulanceId: '', vehicleNumber: '', password: '', emt: { name: '', emtId: '', mobile: '' }, pilot: { name: '', pilotId: '', mobile: '' } })
         } catch (err) {
             alert(err.response?.data?.message || 'Failed to register ambulance. Check if ID already exists.')
         }
@@ -197,7 +197,7 @@ export default function AmbulancesSection({ hospitalId }) {
                             <span className="modal-title">Register Ambulance</span>
                             <button className="btn btn-ghost btn-icon" onClick={() => setAdding(false)}><X size={18} /></button>
                         </div>
-                        {[{ k: 'ambulanceId', l: 'Ambulance ID' }, { k: 'vehicleNumber', l: 'Vehicle Number' }].map(f => (
+                        {[{ k: 'ambulanceId', l: 'Ambulance ID' }, { k: 'vehicleNumber', l: 'Vehicle Number' }, { k: 'password', l: 'Login Password' }].map(f => (
                             <div className="form-group" key={f.k}>
                                 <label className="form-label">{f.l}</label>
                                 <input className="form-input" value={form[f.k]} onChange={e => setForm(p => ({ ...p, [f.k]: e.target.value }))} />
@@ -217,7 +217,7 @@ export default function AmbulancesSection({ hospitalId }) {
                                 <input className="form-input" value={form.pilot[f.k]} onChange={e => setForm(p => ({ ...p, pilot: { ...p.pilot, [f.k]: e.target.value } }))} />
                             </div>
                         ))}
-                        <p style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 12 }}>Default password: <strong>test@1234</strong></p>
+
                         <button className="btn btn-primary btn-full" onClick={create}>Register</button>
                     </div>
                 </div>

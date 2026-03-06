@@ -6,6 +6,9 @@ export default function QRScanner({ onScan }) {
     const [error, setError] = useState('')
     const [started, setStarted] = useState(false)
 
+    const onScanRef = useRef(onScan)
+    useEffect(() => { onScanRef.current = onScan }, [onScan])
+
     useEffect(() => {
         const id = 'qr-scanner-' + Date.now()
         ref.current.id = id
@@ -13,14 +16,14 @@ export default function QRScanner({ onScan }) {
         scanner.start(
             { facingMode: 'environment' },
             { fps: 10, qrbox: { width: 220, height: 220 } },
-            (data) => { scanner.stop().catch(() => { }); onScan(data) },
+            (data) => { scanner.stop().catch(() => { }); onScanRef.current(data) },
             () => { }
         ).then(() => setStarted(true)).catch((err) => {
             setError('Camera unavailable. Please allow camera access and try again.')
             console.warn('QR Scanner Error:', err)
         })
         return () => { scanner.stop().catch(() => { }) }
-    }, [onScan])
+    }, [])
 
     if (error) {
         return (

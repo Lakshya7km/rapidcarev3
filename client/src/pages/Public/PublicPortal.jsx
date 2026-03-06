@@ -22,6 +22,7 @@ export default function PublicPortal() {
     const [loading, setLoading] = useState(true)
 
     const [showDonateForm, setShowDonateForm] = useState(false)
+    const [showModal, setShowModal] = useState(false)
     const [donateForm, setDonateForm] = useState({ name: '', bloodType: 'A+', contact: '', city: '', hospitalId: '' })
     const [donateMsg, setDonateMsg] = useState('')
 
@@ -37,7 +38,30 @@ export default function PublicPortal() {
 
     useEffect(() => {
         let f = hospitals
-        if (search) f = f.filter(h => h.name?.toLowerCase().includes(search.toLowerCase()) || h.address?.city?.toLowerCase().includes(search.toLowerCase()))
+        if (search) {
+            const s = search.toLowerCase()
+            f = f.filter(h => {
+                const nameMatch = h.name?.toLowerCase().includes(s)
+                const cityMatch = h.address?.city?.toLowerCase().includes(s)
+                
+                // Bed types match
+                const beds = bedSummary[h.hospitalId] || {}
+                const bedMatch = Object.keys(beds).some(type => type.toLowerCase().includes(s))
+                
+                // Doctor match
+                const docs = docSummary[h.hospitalId] || []
+                const docMatch = docs.some(d => 
+                    d.name?.toLowerCase().includes(s) || 
+                    (d.specialization || d.speciality || '').toLowerCase().includes(s)
+                )
+                
+                // Blood match
+                const blood = bloodStock[h.hospitalId] || []
+                const bloodMatch = blood.some(b => b.units > 0 && b.bloodType?.toLowerCase().includes(s))
+                
+                return nameMatch || cityMatch || bedMatch || docMatch || bloodMatch
+            })
+        }
 
         // Sort by nearest if we have user location
         if (userPos) {
@@ -59,7 +83,7 @@ export default function PublicPortal() {
             })
         }
         setFiltered(f)
-    }, [search, hospitals, userPos])
+    }, [search, hospitals, userPos, bedSummary, docSummary, bloodStock])
 
     useEffect(() => {
         if (!socket.connected) socket.connect()
@@ -67,13 +91,13 @@ export default function PublicPortal() {
         hospitals.forEach(h => {
             if (!bedSummary[h.hospitalId]) {
                 const now = new Date()
-                api.get(`/beds/summary/${h.hospitalId}`).then(r => setBedSummary(prev => ({ ...prev, [h.hospitalId]: r.data }))).catch(() => { })
-                api.get(`/doctors?hospitalId=${h.hospitalId}`).then(r => setDocSummary(prev => ({ ...prev, [h.hospitalId]: r.data }))).catch(() => { })
+                api.get(`/beds/summary/${h.hospitalId}`).then(r => setBedSummary(prev => ({ ...prev, [h.hospitalId]: r.data }))).catch(err => { console.error('Failed to fetch beds for', h.hospitalId, err) })
+                api.get(`/doctors?hospitalId=${h.hospitalId}`).then(r => setDocSummary(prev => ({ ...prev, [h.hospitalId]: r.data }))).catch(err => { console.error('Failed to fetch doctors for', h.hospitalId, err) })
                 api.get(`/bloodbank?hospitalId=${h.hospitalId}`).then(r => {
                     setBloodStock(prev => ({ ...prev, [h.hospitalId]: r.data }))
                     setFetchedAt(prev => ({ ...prev, [h.hospitalId]: now }))
-                }).catch(() => { })
-                api.get(`/announcements?hospitalId=${h.hospitalId}`).then(r => setAnnouncements(prev => ({ ...prev, [h.hospitalId]: r.data }))).catch(() => { })
+                }).catch(err => { console.error('Failed to fetch bloodbank for', h.hospitalId, err) })
+                api.get(`/announcements?hospitalId=${h.hospitalId}`).then(r => setAnnouncements(prev => ({ ...prev, [h.hospitalId]: r.data }))).catch(err => { console.error('Failed to fetch announcements for', h.hospitalId, err) })
             }
         })
 
@@ -88,6 +112,7 @@ export default function PublicPortal() {
 
         return () => {
             socket.off('doctor:update', handleDocUpdate)
+            socket.disconnect()
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [hospitals])
@@ -107,12 +132,12 @@ export default function PublicPortal() {
     const openDetail = async (h) => {
         setSelected(h)
         setDonateForm({ ...donateForm, hospitalId: h.hospitalId, city: h.address?.city || '' })
-        document.getElementById('hospital-modal').style.display = 'flex'
+        setShowModal(true)
     }
 
     const closeDetail = () => {
         setSelected(null)
-        document.getElementById('hospital-modal').style.display = 'none'
+        setShowModal(false)
     }
 
     const navigateToHospital = (loc, name) => {
@@ -174,7 +199,9 @@ export default function PublicPortal() {
                     <div style={{ background: 'rgba(255, 255, 255, 0.9)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255, 255, 255, 0.3)', borderRadius: 20, padding: '1.5rem', marginBottom: '2rem', display: 'flex', alignItems: 'center', gap: '1.5rem', boxShadow: '0 4px 20px rgba(0,0,0,0.05)' }}>
                         <div style={{ background: '#0b6efd', color: 'white', width: 60, height: 60, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem' }}>🏢</div>
                         <div style={{ flex: 1 }}>
-                            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#0b6efd', textTransform: 'uppercase', marginBottom: 4 }}>Closest Emergency Center Identified</div>
+                            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#0b6efd', textTransform: 'uppercase', marginBottom: 4 }}>
+                                {search ? 'Top Search Match Identified' : 'Closest Emergency Center Identified'}
+                            </div>
                             <h3 style={{ margin: 0, fontWeight: 700, marginBottom: 4 }}>{nearest.name}</h3>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                                 <span style={{ background: '#0b6efd', color: 'white', padding: '4px 12px', borderRadius: 20, fontSize: '0.75rem', fontWeight: 700 }}>{nearest.distance?.toFixed(1)} km</span>
@@ -315,7 +342,8 @@ export default function PublicPortal() {
             </div>
 
             {/* Hospital Detail Modal */}
-            <div id="hospital-modal" style={{ display: 'none', position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 2000, alignItems: 'center', justifyContent: 'center' }} onClick={closeDetail}>
+            {showModal && (
+                <div id="hospital-modal" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={closeDetail}>
                 <div style={{ background: 'white', padding: '1.5rem', borderRadius: 12, width: '90%', maxWidth: 600, maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
                     {selected && (
                         <>
@@ -465,6 +493,7 @@ export default function PublicPortal() {
                     )}
                 </div>
             </div>
+            )}
 
             {/* Donate Blood Modal */}
             {showDonateForm && (

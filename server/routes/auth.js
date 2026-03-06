@@ -1,4 +1,5 @@
 const router = require('express').Router();
+const auth = require('../middleware/auth');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
 const Hospital = require('../models/Hospital');
@@ -55,9 +56,12 @@ router.post('/login', async (req, res) => {
     }
 });
 
-router.post('/change-password', async (req, res) => {
+router.post('/change-password', auth(), async (req, res) => {
     try {
         const { role, username, newPassword } = req.body;
+        if (req.user.role !== 'superadmin' && req.user.ref !== username) {
+            return res.status(403).json({ message: 'Forbidden' });
+        }
         let Model, filter;
         if (role === 'hospital') { Model = Hospital; filter = { hospitalId: username }; }
         else if (role === 'doctor') { Model = Doctor; filter = { doctorId: username }; }

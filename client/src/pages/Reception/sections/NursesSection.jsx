@@ -6,7 +6,7 @@ export default function NursesSection({ hospitalId }) {
     const [nurses, setNurses] = useState([])
     const [adding, setAdding] = useState(false)
     const [loading, setLoading] = useState(true)
-    const [form, setForm] = useState({ nurseId: '', name: '', mobile: '' })
+    const [form, setForm] = useState({ nurseId: '', name: '', mobile: '', password: '' })
     const [msg, setMsg] = useState('')
 
     const load = () => api.get(`/nurses?hospitalId=${hospitalId}`).then(r => setNurses(r.data)).finally(() => setLoading(false))
@@ -15,7 +15,7 @@ export default function NursesSection({ hospitalId }) {
     const create = async () => {
         await api.post('/nurses', { ...form, hospitalId })
         setAdding(false); load(); setMsg('Nurse registered!')
-        setForm({ nurseId: '', name: '', mobile: '' })
+        setForm({ nurseId: '', name: '', mobile: '', password: '' })
     }
 
     if (loading) return <div className="loader-center"><div className="spinner" /></div>
@@ -45,7 +45,7 @@ export default function NursesSection({ hospitalId }) {
                             <span className="modal-title">Register Nurse</span>
                             <button className="btn btn-ghost btn-icon" onClick={() => setAdding(false)}><X size={18} /></button>
                         </div>
-                        {[{ k: 'nurseId', l: 'Nurse ID' }, { k: 'name', l: 'Full Name' }, { k: 'mobile', l: 'Mobile Number' }].map(f => (
+                        {[{ k: 'nurseId', l: 'Nurse ID' }, { k: 'name', l: 'Full Name' }, { k: 'mobile', l: 'Mobile Number' }, { k: 'password', l: 'Login Password' }].map(f => (
                             <div className="form-group" key={f.k}>
                                 <label className="form-label">{f.l}</label>
                                 <input className="form-input" value={form[f.k]} onChange={e => setForm(p => ({ ...p, [f.k]: e.target.value }))} />

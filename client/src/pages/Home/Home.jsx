@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import api from '../../lib/api'
-import { Stethoscope, Truck, ShieldCheck, AlertCircle, X, ChevronRight, Phone, Building2, UserRound, Search, MapPin, Droplets } from 'lucide-react'
+// No longer using unused lucide-react imports
 import './Home.css'
 
 const FEATURES = [

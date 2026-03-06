@@ -4,6 +4,7 @@ import socket from '../../../lib/socket'
 import { Plus, Search, RefreshCw, X, Download, Printer, CheckSquare, Square } from 'lucide-react'
 import QRScanner from '../../../components/QRScanner'
 import QRCode from 'qrcode'
+import { parseBedIdFromQR, buildBedQrUrl, getBedQrBaseUrl } from '../../../lib/bedQr'
 
 const STATUS_COLORS = { Vacant: '#22c55e', Occupied: '#ef4444', Reserved: '#f59e0b', Cleaning: '#8b5cf6' }
 const STATUSES = ['Vacant', 'Occupied', 'Reserved', 'Cleaning']
@@ -55,17 +56,24 @@ export default function BedManagement({ hospitalId }) {
         setSelected(null); setPatientName('')
     }
 
-    const handleQRScan = (data) => {
-        // Data might be a full URL like "http://localhost:5173/bed/AIIMS-RPR-W1-B001" or just the ID
-        const urlParts = data.trim().split('/')
-        const bedId = urlParts[urlParts.length - 1]
-
+    const handleQRScan = async (data) => {
+        const bedId = parseBedIdFromQR(data)
         const bed = beds.find(b => b.bedId === bedId)
+        setScanMode(false)
+
         if (bed) {
-            setScanMode(false)
             setTimeout(() => setSelected(bed), 180)
-        } else {
-            setScanMode(false)
+            return
+        }
+
+        try {
+            const r = await api.get(`/beds/public/${bedId}`)
+            if (r.data?.hospitalId === hospitalId) {
+                setTimeout(() => setSelected(r.data), 180)
+            } else {
+                setMsg(`Bed "${bedId}" belongs to another hospital`)
+            }
+        } catch {
             setMsg(`Bed "${bedId}" not found`)
         }
     }
@@ -89,11 +97,11 @@ export default function BedManagement({ hospitalId }) {
         if (bedsToDownload.length === 0) return
         setDownloading(true)
         try {
-            const baseUrl = window.location.origin
+            const baseUrl = getBedQrBaseUrl()
             // Build an HTML page with all QR label cards
             const cards = await Promise.all(bedsToDownload.map(async (bed) => {
                 // Encode a full URL so any camera app can open the scan page directly
-                const bedUrl = `${baseUrl}/bed/${bed.bedId}`
+                const bedUrl = buildBedQrUrl(bed.bedId)
                 const qrDataUrl = await QRCode.toDataURL(bedUrl, { width: 180, margin: 1 })
                 return `
                 <div class="label">
@@ -129,6 +137,7 @@ export default function BedManagement({ hospitalId }) {
 </style>
 </head>
 <body>
+<div style="padding: 0 12px 8px; font-size: 10px; color: #666;">QR base URL: ${baseUrl}</div>
 <div class="grid">
 ${cards.join('\n')}
 </div>
@@ -139,6 +148,8 @@ ${cards.join('\n')}
             win.document.write(html)
             win.document.close()
             setTimeout(() => win.print(), 500)
+        } catch (e) {
+            setMsg(e?.message || 'Failed to generate QR labels')
         } finally {
             setDownloading(false)
         }
@@ -150,6 +161,20 @@ ${cards.join('\n')}
     if (loading) return <div className="loader-center"><div className="spinner" /></div>
 
     const bedsForDownload = selectedIds.size > 0 ? filtered.filter(b => selectedIds.has(b.bedId)) : filtered
+
+    const regenerateQRCodes = async () => {
+        if (bedsForDownload.length === 0) {
+            setMsg('No beds available to regenerate QR labels')
+            return
+        }
+
+        const scope = selectedIds.size > 0 ? `${selectedIds.size} selected beds` : `all ${filtered.length} beds`
+        const ok = window.confirm(`Regenerate QR labels for ${scope}?\n\nUse this when old labels were generated from localhost or a wrong domain.`)
+        if (!ok) return
+
+        await downloadQRPDF(bedsForDownload)
+        setMsg(`Regenerated QR labels for ${scope}. Replace old labels to avoid white-screen scans.`)
+    }
 
     return (
         <div>
@@ -171,6 +196,15 @@ ${cards.join('\n')}
                 <button className="btn btn-outline btn-sm" onClick={() => setScanMode(true)}><Search size={14} /> QR Scan</button>
                 <button className="btn btn-ghost btn-sm" onClick={load}><RefreshCw size={14} /></button>
                 <div style={{ flex: 1 }} />
+                <button
+                    className="btn btn-outline btn-sm"
+                    onClick={regenerateQRCodes}
+                    disabled={downloading}
+                    title={selectedIds.size > 0 ? `Regenerate QR for ${selectedIds.size} selected beds` : `Regenerate QR for all ${filtered.length} beds`}
+                >
+                    <RefreshCw size={14} />
+                    {selectedIds.size > 0 ? `Regenerate ${selectedIds.size} QR` : 'Regenerate All QR'}
+                </button>
                 <button
                     className="btn btn-sm"
                     style={{ background: '#f97316', color: 'white', opacity: downloading ? 0.6 : 1 }}
