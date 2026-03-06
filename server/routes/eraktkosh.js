@@ -3,50 +3,7 @@ const https = require('https');
 
 // State codes for eRaktKosh
 // 05 = Chhattisgarh (default since RapidCare is based in Raipur)
-const FALLBACK_DATA = [
-    {
-        bankName: "AIIMS Raipur Blood Bank",
-        city: "Raipur",
-        state: "Chhattisgarh",
-        contact: "0771-2573777",
-        stock: { "A+": 12, "A-": 3, "B+": 18, "B-": 2, "O+": 25, "O-": 5, "AB+": 7, "AB-": 1 }
-    },
-    {
-        bankName: "Dr. B.R. Ambedkar Memorial Hospital Blood Bank",
-        city: "Raipur",
-        state: "Chhattisgarh",
-        contact: "0771-4234567",
-        stock: { "A+": 8, "A-": 2, "B+": 14, "B-": 1, "O+": 19, "O-": 3, "AB+": 5, "AB-": 0 }
-    },
-    {
-        bankName: "Amar Blood Bank",
-        city: "Raipur",
-        state: "Chhattisgarh",
-        contact: "0771-4005000",
-        stock: { "A+": 6, "A-": 1, "B+": 10, "B-": 2, "O+": 15, "O-": 4, "AB+": 3, "AB-": 1 }
-    },
-    {
-        bankName: "Vivekananda Blood Bank",
-        city: "Bilaspur",
-        state: "Chhattisgarh",
-        contact: "07752-234567",
-        stock: { "A+": 5, "A-": 1, "B+": 9, "B-": 0, "O+": 11, "O-": 2, "AB+": 4, "AB-": 0 }
-    },
-    {
-        bankName: "CIMS Blood Bank",
-        city: "Bilaspur",
-        state: "Chhattisgarh",
-        contact: "07752-411311",
-        stock: { "A+": 9, "A-": 2, "B+": 13, "B-": 1, "O+": 20, "O-": 3, "AB+": 6, "AB-": 1 }
-    },
-    {
-        bankName: "Red Cross Blood Bank Raipur",
-        city: "Raipur",
-        state: "Chhattisgarh",
-        contact: "0771-2234567",
-        stock: { "A+": 15, "A-": 4, "B+": 22, "B-": 3, "O+": 30, "O-": 7, "AB+": 9, "AB-": 2 }
-    }
-];
+const FALLBACK_DATA = [];
 
 // Try to fetch from eRaktKosh; fall back to curated data
 function fetchEraktKosh(stateCode) {
