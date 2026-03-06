@@ -88,6 +88,7 @@ export default function PublicPortal() {
 
         return () => {
             socket.off('doctor:update', handleDocUpdate)
+            socket.disconnect()
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [hospitals])
@@ -107,12 +108,10 @@ export default function PublicPortal() {
     const openDetail = async (h) => {
         setSelected(h)
         setDonateForm({ ...donateForm, hospitalId: h.hospitalId, city: h.address?.city || '' })
-        document.getElementById('hospital-modal').style.display = 'flex'
     }
 
     const closeDetail = () => {
         setSelected(null)
-        document.getElementById('hospital-modal').style.display = 'none'
     }
 
     const navigateToHospital = (loc, name) => {
@@ -315,7 +314,7 @@ export default function PublicPortal() {
             </div>
 
             {/* Hospital Detail Modal */}
-            <div id="hospital-modal" style={{ display: 'none', position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 2000, alignItems: 'center', justifyContent: 'center' }} onClick={closeDetail}>
+            {selected && <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={closeDetail}>
                 <div style={{ background: 'white', padding: '1.5rem', borderRadius: 12, width: '90%', maxWidth: 600, maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
                     {selected && (
                         <>
@@ -464,7 +463,7 @@ export default function PublicPortal() {
                         </>
                     )}
                 </div>
-            </div>
+            </div>}
 
             {/* Donate Blood Modal */}
             {showDonateForm && (

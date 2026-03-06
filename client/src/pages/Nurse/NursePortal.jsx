@@ -92,7 +92,10 @@ export default function NursePortal() {
     }
 
     const handleQRScan = (data) => {
-        const bedId = data.trim()
+        let bedId = data.trim()
+        // QR codes encode full URLs like https://host/bed/BED-ID — extract just the bedId
+        const match = bedId.match(/\/bed\/(.+)$/)
+        if (match) bedId = match[1]
         const bed = beds.find(b => b.bedId === bedId)
         if (bed) {
             setScanMode(false)

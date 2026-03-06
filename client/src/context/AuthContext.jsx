@@ -8,9 +8,15 @@ export function AuthProvider({ children }) {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const t = localStorage.getItem('rc_token');
-        const u = localStorage.getItem('rc_user');
-        if (t && u) { setToken(t); setUser(JSON.parse(u)); }
+        try {
+            const t = localStorage.getItem('rc_token');
+            const u = localStorage.getItem('rc_user');
+            if (t && u) { setToken(t); setUser(JSON.parse(u)); }
+        } catch {
+            // Corrupted localStorage — clear and start fresh
+            localStorage.removeItem('rc_token');
+            localStorage.removeItem('rc_user');
+        }
         setLoading(false);
     }, []);
 

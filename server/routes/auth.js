@@ -55,9 +55,11 @@ router.post('/login', async (req, res) => {
     }
 });
 
+// Requires the caller to supply their current password for verification
 router.post('/change-password', async (req, res) => {
     try {
-        const { role, username, newPassword } = req.body;
+        const { role, username, currentPassword, newPassword } = req.body;
+        if (!currentPassword) return res.status(400).json({ message: 'Current password is required' });
         let Model, filter;
         if (role === 'hospital') { Model = Hospital; filter = { hospitalId: username }; }
         else if (role === 'doctor') { Model = Doctor; filter = { doctorId: username }; }
@@ -67,6 +69,8 @@ router.post('/change-password', async (req, res) => {
         else return res.status(400).json({ message: 'Invalid role' });
         const doc = await Model.findOne(filter);
         if (!doc) return res.status(404).json({ message: 'User not found' });
+        const valid = await doc.comparePassword(currentPassword);
+        if (!valid) return res.status(401).json({ message: 'Current password is incorrect' });
         doc.password = newPassword;
         if (doc.forcePasswordChange !== undefined) doc.forcePasswordChange = false;
         await doc.save();
