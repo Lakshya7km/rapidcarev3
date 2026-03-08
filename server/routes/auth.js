@@ -37,7 +37,6 @@ router.post('/login', async (req, res) => {
         const userObj = {
             id: user._id,
             role,
-            ref: username,
             username: username,
             hospitalId: payload.hospitalId,
             ...(role === 'doctor' ? { name: user.name, speciality: user.speciality, doctorId: user.doctorId } : {}),

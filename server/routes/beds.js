@@ -62,21 +62,13 @@ router.get('/summary/:hospitalId', async (req, res) => {
     try {
         const beds = await Bed.find({ hospitalId: req.params.hospitalId });
         const summary = {};
-        let latestUpdate = null;
         beds.forEach(b => {
             if (!summary[b.bedType]) summary[b.bedType] = { total: 0, vacant: 0, occupied: 0 };
             summary[b.bedType].total++;
             if (b.status === 'Vacant') summary[b.bedType].vacant++;
             if (b.status === 'Occupied') summary[b.bedType].occupied++;
-            
-            // Track the most recent update across all beds for this hospital
-            if (b.updatedAt) {
-                if (!latestUpdate || new Date(b.updatedAt) > new Date(latestUpdate)) {
-                    latestUpdate = b.updatedAt;
-                }
-            }
         });
-        res.json({ beds: summary, lastUpdated: latestUpdate });
+        res.json(summary);
     } catch (e) { res.status(500).json({ message: e.message }); }
 });
 
